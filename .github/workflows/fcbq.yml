@@ -4,14 +4,17 @@ on:
   schedule:
     - cron: '*/10 * * * *'   # cada 10 minutos (GitHub puede retrasarlo algunos minutos)
   workflow_dispatch:          # botón "Run workflow" para lanzarlo a mano
+    inputs:
+      explorar:
+        description: 'URLs a inspeccionar (separadas por espacios), solo para depurar'
+        required: false
+        default: ''
   push:
     branches: [main, master]
     paths: ['basquet/**', 'scripts/fcbq-update.mjs', '.github/workflows/fcbq.yml', 'index.html']
 
 permissions:
   contents: write
-  pages: write
-  id-token: write
 
 concurrency:
   group: fcbq
@@ -20,15 +23,16 @@ concurrency:
 jobs:
   update:
     runs-on: ubuntu-latest
-    environment:
-      name: github-pages
-      url: ${{ steps.deploy.outputs.page_url }}
     steps:
       - uses: actions/checkout@v4
 
       - uses: actions/setup-node@v4
         with:
           node-version: 20
+
+      - name: Explorar URLs
+        if: ${{ github.event.inputs.explorar != '' }}
+        run: node scripts/fcbq-update.mjs --explorar ${{ github.event.inputs.explorar }}
 
       - name: Descargar jugada a jugada y calcular estadísticas
         run: node scripts/fcbq-update.mjs
@@ -42,12 +46,18 @@ jobs:
             echo "Sin cambios"
           else
             git commit -m "Actualizar estadísticas FCBQ"
+            git pull --rebase
             git push
           fi
 
-      - uses: actions/configure-pages@v5
-      - uses: actions/upload-pages-artifact@v3
-        with:
-          path: .
-      - id: deploy
-        uses: actions/deploy-pages@v4
+      - name: Publicar web (rama gh-pages)
+        run: |
+          rm -rf /tmp/site && mkdir /tmp/site
+          cp -r index.html basquet /tmp/site/
+          touch /tmp/site/.nojekyll
+          cd /tmp/site
+          git init -q -b gh-pages
+          git config user.name "fcbq-bot"
+          git config user.email "fcbq-bot@users.noreply.github.com"
+          git add -A && git commit -qm "Publicar web"
+          git push -f "https://x-access-token:${{ secrets.GITHUB_TOKEN }}@github.com/${{ github.repository }}.git" gh-pages

@@ -207,4 +207,27 @@ async function main() {
   } else console.log('Sin cambios');
 }
 
-if (process.argv[1] === fileURLToPath(import.meta.url)) main().catch((e) => { console.error(e); process.exit(1); });
+// Modo depuración: muestra qué devuelve cada URL (enlaces, ids, estructura JSON)
+async function explorar(urls) {
+  for (const url of urls) {
+    console.log(`\n===== ${url}`);
+    try {
+      const r = await fetch(url, { headers: HEADERS, signal: AbortSignal.timeout(30000) });
+      const body = await r.text();
+      console.log(`status ${r.status} · ${r.headers.get('content-type')} · ${body.length} bytes`);
+      try {
+        const j = JSON.parse(body);
+        const moves = findMoves(j);
+        console.log(`jugadas detectadas: ${moves.length}`);
+        console.log(JSON.stringify(j, null, 1).slice(0, 3000));
+        if (moves.length) console.log('ejemplos:', JSON.stringify(moves.slice(0, 5), null, 1), '\ntextos:', [...new Set(moves.map(moveText))].join(' | '));
+      } catch {
+        const links = [...new Set([...body.matchAll(/(?:href|src|data-[\w-]+)="([^"]+)"/g)].map((m) => m[1]))];
+        console.log('enlaces:', links.filter((l) => !/\.(css|png|jpg|svg|ico|woff)/.test(l)).slice(0, 200).join('\n  '));
+        console.log('urls en scripts:', [...new Set(body.match(/https?:\/\/[^"'\s<>)]+/g) || [])].slice(0, 80).join('\n  '));
+      }
+    } catch (e) { console.log('error', e.message); }
+  }
+}
+
+if (process.argv[1] === fileURLToPath(import.meta.url)) (process.argv[2] === '--explorar' ? explorar(process.argv.slice(3)) : main()).catch((e) => { console.error(e); process.exit(1); });

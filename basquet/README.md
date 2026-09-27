@@ -5,7 +5,7 @@ puntos, canastas de 2, triples, tiros libres, faltas (y rebotes, asistencias, et
 
 ## Puesta en marcha (una sola vez)
 1. Mezcla esta rama en `main`.
-2. GitHub → **Settings → Pages → Source: GitHub Actions**.
+2. GitHub → **Settings → Pages → Source: Deploy from a branch → `gh-pages`** (normalmente se activa solo).
 3. Edita `basquet/config.json` y pega el enlace de la página de tu equipo en basquetcatala.cat
    (y/o enlaces de partidos concretos).
 
