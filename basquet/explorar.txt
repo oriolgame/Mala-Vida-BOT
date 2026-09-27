@@ -1,4 +1,4 @@
-https://msstats.optimalwayconsulting.com/v1/fcbq/getJsonWithMatchMoves/81f8b54d-6c9f-407a-b4cc-6ab9565e537e?currentSeason=false
-https://msstats.optimalwayconsulting.com/v1/fcbq/getJsonWithMatchStats/81f8b54d-6c9f-407a-b4cc-6ab9565e537e?currentSeason=false
+https://msstats.optimalwayconsulting.com/v1/fcbq/getJsonWithMatchMoves/a9afd4ae-15c1-43fb-b514-d3985f3602b6
+https://msstats.optimalwayconsulting.com/v1/fcbq/getJsonWithMatchMoves/a9afd4ae-15c1-43fb-b514-d3985f3602b6?currentSeason=true
+https://msstats.optimalwayconsulting.com/v1/fcbq/getJsonWithMatchStats/a9afd4ae-15c1-43fb-b514-d3985f3602b6
 https://www.basquetcatala.cat/equip/73258
-https://www.basquetcatala.cat/competicions/resultats/17061

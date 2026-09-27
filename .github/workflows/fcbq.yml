@@ -36,7 +36,10 @@ jobs:
         if: ${{ github.event.inputs.explorar != '' || hashFiles('basquet/explorar.txt') != '' }}
         env:
           EXPLORAR: ${{ github.event.inputs.explorar }}
-        run: node scripts/fcbq-update.mjs --explorar $EXPLORAR $(cat basquet/explorar.txt 2>/dev/null)
+        run: |
+          npm i --no-save playwright@1 >/dev/null 2>&1
+          npx playwright install --with-deps chromium >/dev/null 2>&1
+          node scripts/fcbq-explorar.mjs $EXPLORAR $(cat basquet/explorar.txt 2>/dev/null)
 
       - name: Descargar jugada a jugada y calcular estadísticas
         if: env.PRINCIPAL == 'true'
