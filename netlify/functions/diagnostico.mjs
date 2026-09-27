@@ -2,7 +2,7 @@
 // para poder revisarlos después.  POST → guarda · GET → últimos informes
 import { getStore } from '@netlify/blobs';
 
-const store = () => globalThis.__bsktStore || getStore('bskt-stats');
+const store = () => globalThis.__bsktStore || getStore({ name: 'bskt-stats', consistency: 'strong' });
 const json = (b, s = 200) => new Response(JSON.stringify(b), { status: s, headers: { 'content-type': 'application/json', 'cache-control': 'no-store' } });
 
 export default async (req, context) => {
