@@ -7,53 +7,11 @@ jobs:
   probe:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
       - run: |
           B=https://bskt-stats.netlify.app/fcbq
-          M=6ab81f29bcc75a0001ce24fa
-          curl -sS -m 30 "$B/getJsonWithMatchMoves/$M?currentSeason=true" -o moves.json
-          curl -sS -m 30 "$B/getJsonWithMatchStats/$M?currentSeason=true" -o stats.json
-          curl -sS -m 30 "$B/player-stats/federated/fbfcb946-98d0-11e9-a2a5-0216824770c2/team/88829" -o player.json
-          wc -c moves.json stats.json player.json
-          python3 - <<'PY'
-          import json
-          p=json.load(open('player.json'))
-          ev=p['88829']['evolutiveStats'][0]
-          print('evolutiveStats[0] campos no numéricos:', {k:v for k,v in ev.items() if not isinstance(v,(int,float))})
-          for f in ['moves.json','stats.json']:
-              d=json.load(open(f)); print('=====',f, type(d).__name__)
-              def show(n,p='',depth=0):
-                  if depth>3: return
-                  if isinstance(n,dict):
-                      for k,v in n.items():
-                          if isinstance(v,(dict,list)): print(p+k, type(v).__name__, len(v)); show(v,p+'  ',depth+1)
-                          elif depth<3: print(p+k,'=',str(v)[:70])
-                  elif isinstance(n,list) and n:
-                      print(p+'[0] =', json.dumps(n[0],ensure_ascii=False)[:700]); show(n[0],p+'  ',depth+1)
-              show(d)
-          d=json.load(open('moves.json'))
-          def arrays(n):
-              if isinstance(n,list):
-                  yield n
-                  for x in n: yield from arrays(x)
-              elif isinstance(n,dict):
-                  for v in n.values(): yield from arrays(v)
-          big=max(arrays(d),key=len,default=[])
-          print('array más largo:',len(big))
-          for m in big[:12]: print(json.dumps(m,ensure_ascii=False)[:400])
-          from collections import Counter
-          keys=[k for k in (big[0].keys() if big and isinstance(big[0],dict) else [])]
-          for k in keys:
-              vals=Counter(str(m.get(k)) for m in big if isinstance(m,dict))
-              if len(vals)<60: print('valores de',k,':',dict(vals.most_common(60)))
-          PY
-      - run: |
-          cat > t.mjs <<'JS'
-          import { readFileSync } from 'node:fs';
-          import { buildMatch } from './basquet/fcbq.js';
-          const m = buildMatch('x', JSON.parse(readFileSync('moves.json')), JSON.parse(readFileSync('stats.json')));
-          console.log('jugadas', m.jugadas, 'marcador', m.marcador, 'periodo', m.periodoActual);
-          for (const e of m.equipos) { console.log(e.nombre, JSON.stringify(e.total)); for (const j of e.jugadores) console.log('  ', j.dorsal, j.nombre, 'pts', j.puntos, 'T1', j.t1+'/'+j.t1i, 'T2', j.t2+'/'+j.t2i, 'T3', j.t3+'/'+j.t3i, 'F', j.faltas); }
-          console.log('no reconocidas', JSON.stringify(m.jugadasNoReconocidas));
-          JS
-          node t.mjs
+          for M in 6ab81f29bcc75a0001ce24fa 2b5cd3f4-2158-4ada-a4d6-ec5bbbc4080f; do
+            for p in "getJsonWithMatchMoves/$M" "getJsonWithMatchMoves/$M?currentSeason=false" "getJsonWithMatchStats/$M" \
+                     "getJsonWithMatchMovesJwt/$M?currentSeason=true" "getJsonWithMatchStatsWithJwt/$M?currentSeason=true"; do
+              printf "%-80s " "$p"; curl -sS -m 30 -o r.txt -w "%{http_code} " "$B/$p"; head -c 200 r.txt; echo
+            done
+          done
