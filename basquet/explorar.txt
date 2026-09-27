@@ -1,1 +1,0 @@
-https://msstats.optimalwayconsulting.com/v1/fcbq/getJsonWithMatchMoves/69a43ead5213ba0001ee1978?currentSeason=true
