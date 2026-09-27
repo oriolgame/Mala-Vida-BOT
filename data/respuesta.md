@@ -1,0 +1,1 @@
+✅ Partido añadido (2b5cd3f4-2158-4ada-a4d6-ec5bbbc4080f). Las estadísticas aparecerán en la web en cuanto la FCBQ publique el jugada a jugada, y se actualizarán solas cada 10 minutos.

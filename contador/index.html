@@ -1,0 +1,530 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Contador de Personas</title>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      font-family: 'Segoe UI', system-ui, sans-serif;
+      background: #0f0f13;
+      color: #e8e8f0;
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: flex-start;
+      padding: 24px 16px;
+      gap: 20px;
+    }
+
+    header {
+      text-align: center;
+    }
+
+    header h1 {
+      font-size: 1.8rem;
+      font-weight: 700;
+      letter-spacing: -0.5px;
+      color: #ffffff;
+    }
+
+    header p {
+      margin-top: 6px;
+      color: #888;
+      font-size: 0.9rem;
+    }
+
+    #status-bar {
+      width: 100%;
+      max-width: 720px;
+      background: #1a1a24;
+      border: 1px solid #2a2a38;
+      border-radius: 10px;
+      padding: 10px 16px;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      font-size: 0.85rem;
+    }
+
+    #status-dot {
+      width: 10px;
+      height: 10px;
+      border-radius: 50%;
+      flex-shrink: 0;
+      background: #555;
+      transition: background 0.3s;
+    }
+    #status-dot.loading { background: #f59e0b; animation: pulse 1s infinite; }
+    #status-dot.ready   { background: #22c55e; }
+    #status-dot.error   { background: #ef4444; }
+
+    @keyframes pulse {
+      0%, 100% { opacity: 1; }
+      50%       { opacity: 0.4; }
+    }
+
+    #status-text { flex: 1; color: #aaa; }
+
+    /* Counter badge */
+    #counter-badge {
+      font-size: 5rem;
+      font-weight: 800;
+      line-height: 1;
+      color: #fff;
+      text-shadow: 0 0 40px rgba(99,102,241,0.6);
+      transition: all 0.2s ease;
+    }
+
+    #counter-label {
+      font-size: 1rem;
+      color: #6366f1;
+      font-weight: 600;
+      letter-spacing: 2px;
+      text-transform: uppercase;
+      margin-top: -4px;
+    }
+
+    /* Video wrapper */
+    #canvas-wrapper {
+      position: relative;
+      width: 100%;
+      max-width: 720px;
+      border-radius: 12px;
+      overflow: hidden;
+      background: #111;
+      border: 2px solid #2a2a38;
+    }
+
+    #video {
+      display: block;
+      width: 100%;
+      height: auto;
+      opacity: 0;
+      transition: opacity 0.5s;
+    }
+
+    #canvas {
+      position: absolute;
+      top: 0; left: 0;
+      width: 100%;
+      height: 100%;
+    }
+
+    #placeholder {
+      position: absolute;
+      inset: 0;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      gap: 12px;
+      color: #555;
+      font-size: 0.9rem;
+      pointer-events: none;
+    }
+
+    #placeholder svg { opacity: 0.4; }
+
+    /* Buttons */
+    .btn {
+      padding: 12px 28px;
+      border: none;
+      border-radius: 8px;
+      font-size: 0.95rem;
+      font-weight: 600;
+      cursor: pointer;
+      transition: all 0.15s;
+    }
+
+    .btn-primary {
+      background: #6366f1;
+      color: #fff;
+    }
+    .btn-primary:hover { background: #4f52d9; transform: translateY(-1px); }
+    .btn-primary:active { transform: translateY(0); }
+    .btn-primary:disabled { background: #333; color: #666; cursor: not-allowed; transform: none; }
+
+    .btn-secondary {
+      background: #1e1e2e;
+      color: #bbb;
+      border: 1px solid #333;
+    }
+    .btn-secondary:hover { background: #2a2a3e; color: #fff; }
+
+    #controls {
+      display: flex;
+      gap: 10px;
+      flex-wrap: wrap;
+      justify-content: center;
+    }
+
+    /* Stats row */
+    #stats {
+      display: flex;
+      gap: 16px;
+      flex-wrap: wrap;
+      justify-content: center;
+    }
+
+    .stat-card {
+      background: #1a1a24;
+      border: 1px solid #2a2a38;
+      border-radius: 10px;
+      padding: 12px 20px;
+      text-align: center;
+      min-width: 110px;
+    }
+
+    .stat-value {
+      font-size: 1.5rem;
+      font-weight: 700;
+      color: #fff;
+    }
+
+    .stat-label {
+      font-size: 0.72rem;
+      color: #666;
+      text-transform: uppercase;
+      letter-spacing: 1px;
+      margin-top: 2px;
+    }
+
+    /* Settings panel */
+    #settings {
+      width: 100%;
+      max-width: 720px;
+      background: #1a1a24;
+      border: 1px solid #2a2a38;
+      border-radius: 10px;
+      padding: 16px 20px;
+    }
+
+    #settings summary {
+      cursor: pointer;
+      font-size: 0.85rem;
+      color: #888;
+      user-select: none;
+    }
+
+    #settings-body {
+      margin-top: 14px;
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+    }
+
+    .setting-row {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 16px;
+    }
+
+    .setting-row label {
+      font-size: 0.85rem;
+      color: #aaa;
+    }
+
+    input[type=range] {
+      accent-color: #6366f1;
+      width: 140px;
+    }
+
+    .setting-value {
+      font-size: 0.82rem;
+      color: #fff;
+      width: 36px;
+      text-align: right;
+    }
+  </style>
+</head>
+<body>
+
+<header>
+  <h1>Contador de Personas</h1>
+  <p>Detección en tiempo real con IA directamente en tu navegador</p>
+</header>
+
+<div id="status-bar">
+  <div id="status-dot" class="loading"></div>
+  <span id="status-text">Cargando modelo de IA…</span>
+</div>
+
+<div id="counter-badge">—</div>
+<div id="counter-label">personas</div>
+
+<div id="canvas-wrapper">
+  <video id="video" autoplay muted playsinline></video>
+  <canvas id="canvas"></canvas>
+  <div id="placeholder">
+    <svg width="64" height="64" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.2">
+      <path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/>
+      <circle cx="12" cy="13" r="4"/>
+    </svg>
+    <span id="placeholder-text">Inicia la cámara para comenzar</span>
+  </div>
+</div>
+
+<div id="controls">
+  <button id="btn-start" class="btn btn-primary" disabled>Iniciar cámara</button>
+  <button id="btn-stop"  class="btn btn-secondary" style="display:none">Detener</button>
+</div>
+
+<div id="stats">
+  <div class="stat-card">
+    <div class="stat-value" id="stat-max">—</div>
+    <div class="stat-label">Máximo</div>
+  </div>
+  <div class="stat-card">
+    <div class="stat-value" id="stat-fps">—</div>
+    <div class="stat-label">FPS</div>
+  </div>
+  <div class="stat-card">
+    <div class="stat-value" id="stat-conf">—</div>
+    <div class="stat-label">Confianza</div>
+  </div>
+</div>
+
+<details id="settings">
+  <summary>Ajustes de detección</summary>
+  <div id="settings-body">
+    <div class="setting-row">
+      <label>Umbral de confianza</label>
+      <input type="range" id="threshold" min="10" max="95" value="40" step="5" />
+      <span class="setting-value" id="threshold-val">40%</span>
+    </div>
+    <div class="setting-row">
+      <label>Intervalo de detección</label>
+      <input type="range" id="interval" min="100" max="1000" value="300" step="100" />
+      <span class="setting-value" id="interval-val">300ms</span>
+    </div>
+  </div>
+</details>
+
+<!-- TensorFlow.js + COCO-SSD (person detection) -->
+<script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs@4.20.0/dist/tf.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@tensorflow-models/coco-ssd@2.2.3/dist/coco-ssd.min.js"></script>
+
+<script>
+(function () {
+  'use strict';
+
+  const video       = document.getElementById('video');
+  const canvas      = document.getElementById('canvas');
+  const ctx         = canvas.getContext('2d');
+  const btnStart    = document.getElementById('btn-start');
+  const btnStop     = document.getElementById('btn-stop');
+  const badge       = document.getElementById('counter-badge');
+  const placeholder = document.getElementById('placeholder');
+  const placeholderTxt = document.getElementById('placeholder-text');
+  const statusDot   = document.getElementById('status-dot');
+  const statusText  = document.getElementById('status-text');
+  const statMax     = document.getElementById('stat-max');
+  const statFps     = document.getElementById('stat-fps');
+  const statConf    = document.getElementById('stat-conf');
+  const thresholdEl = document.getElementById('threshold');
+  const thresholdVal= document.getElementById('threshold-val');
+  const intervalEl  = document.getElementById('interval');
+  const intervalVal = document.getElementById('interval-val');
+
+  let model = null;
+  let stream = null;
+  let animFrame = null;
+  let detecting = false;
+  let maxCount = 0;
+  let lastFpsTime = performance.now();
+  let frameCount = 0;
+  let currentFps = 0;
+  let detectionTimer = null;
+
+  // Settings
+  let threshold = 0.40;
+  let detectionInterval = 300;
+
+  thresholdEl.addEventListener('input', () => {
+    threshold = thresholdEl.value / 100;
+    thresholdVal.textContent = thresholdEl.value + '%';
+  });
+
+  intervalEl.addEventListener('input', () => {
+    detectionInterval = parseInt(intervalEl.value);
+    intervalVal.textContent = intervalEl.value + 'ms';
+    if (detecting) restartDetectionLoop();
+  });
+
+  // Load model
+  async function loadModel() {
+    try {
+      setStatus('loading', 'Cargando modelo de IA (COCO-SSD)…');
+      model = await cocoSsd.load({ base: 'mobilenet_v2' });
+      setStatus('ready', 'Modelo listo — pulsa "Iniciar cámara"');
+      btnStart.disabled = false;
+    } catch (e) {
+      setStatus('error', 'Error al cargar el modelo: ' + e.message);
+    }
+  }
+
+  function setStatus(type, text) {
+    statusDot.className = type;
+    statusText.textContent = text;
+  }
+
+  // Camera
+  btnStart.addEventListener('click', startCamera);
+  btnStop.addEventListener('click', stopCamera);
+
+  async function startCamera() {
+    try {
+      stream = await navigator.mediaDevices.getUserMedia({
+        video: { facingMode: 'environment', width: { ideal: 1280 }, height: { ideal: 720 } },
+        audio: false
+      });
+      video.srcObject = stream;
+      video.onloadedmetadata = () => {
+        video.play();
+        video.style.opacity = '1';
+        placeholder.style.display = 'none';
+        canvas.width  = video.videoWidth;
+        canvas.height = video.videoHeight;
+        btnStart.style.display = 'none';
+        btnStop.style.display = '';
+        setStatus('ready', 'Detectando personas…');
+        startDetectionLoop();
+        requestAnimationFrame(drawLoop);
+      };
+    } catch (e) {
+      setStatus('error', 'Sin acceso a la cámara: ' + e.message);
+      placeholderTxt.textContent = 'No se pudo acceder a la cámara';
+    }
+  }
+
+  function stopCamera() {
+    if (stream) {
+      stream.getTracks().forEach(t => t.stop());
+      stream = null;
+    }
+    if (animFrame) { cancelAnimationFrame(animFrame); animFrame = null; }
+    clearTimeout(detectionTimer);
+    detecting = false;
+    video.style.opacity = '0';
+    placeholder.style.display = '';
+    placeholderTxt.textContent = 'Inicia la cámara para comenzar';
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+    badge.textContent = '—';
+    maxCount = 0;
+    statMax.textContent = '—';
+    statFps.textContent = '—';
+    statConf.textContent = '—';
+    btnStart.style.display = '';
+    btnStop.style.display = 'none';
+    setStatus('ready', 'Cámara detenida — pulsa "Iniciar cámara" para reanudar');
+  }
+
+  // Detection loop (throttled)
+  let lastPredictions = [];
+
+  function startDetectionLoop() {
+    detecting = true;
+    scheduleDetection();
+  }
+
+  function restartDetectionLoop() {
+    clearTimeout(detectionTimer);
+    scheduleDetection();
+  }
+
+  function scheduleDetection() {
+    if (!detecting) return;
+    detectionTimer = setTimeout(async () => {
+      if (video.readyState >= 2 && model) {
+        try {
+          lastPredictions = await model.detect(video);
+        } catch (_) {}
+      }
+      scheduleDetection();
+    }, detectionInterval);
+  }
+
+  // Render loop (smooth, RAF)
+  function drawLoop(ts) {
+    if (!stream) return;
+    animFrame = requestAnimationFrame(drawLoop);
+
+    // FPS counter
+    frameCount++;
+    const elapsed = ts - lastFpsTime;
+    if (elapsed >= 1000) {
+      currentFps = Math.round((frameCount * 1000) / elapsed);
+      frameCount = 0;
+      lastFpsTime = ts;
+      statFps.textContent = currentFps;
+    }
+
+    // Sync canvas size if video dimensions changed
+    if (canvas.width !== video.videoWidth || canvas.height !== video.videoHeight) {
+      canvas.width  = video.videoWidth;
+      canvas.height = video.videoHeight;
+    }
+
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+    const people = lastPredictions.filter(
+      p => p.class === 'person' && p.score >= threshold
+    );
+
+    // Update counter
+    const count = people.length;
+    badge.textContent = count;
+    if (count > maxCount) {
+      maxCount = count;
+      statMax.textContent = maxCount;
+    }
+
+    // Average confidence
+    if (people.length > 0) {
+      const avgConf = people.reduce((s, p) => s + p.score, 0) / people.length;
+      statConf.textContent = Math.round(avgConf * 100) + '%';
+    } else {
+      statConf.textContent = '—';
+    }
+
+    // Draw bounding boxes
+    people.forEach((p, i) => {
+      const [x, y, w, h] = p.bbox;
+      const conf = Math.round(p.score * 100);
+
+      // Box
+      ctx.strokeStyle = '#6366f1';
+      ctx.lineWidth = 2.5;
+      ctx.shadowColor = '#6366f1';
+      ctx.shadowBlur = 8;
+      ctx.strokeRect(x, y, w, h);
+      ctx.shadowBlur = 0;
+
+      // Label background
+      const label = `Persona ${i + 1}  ${conf}%`;
+      ctx.font = 'bold 13px Segoe UI, system-ui, sans-serif';
+      const textW = ctx.measureText(label).width;
+      const labelH = 22;
+      const labelY = y > labelH + 4 ? y - labelH - 2 : y + h + 2;
+
+      ctx.fillStyle = 'rgba(99,102,241,0.85)';
+      ctx.beginPath();
+      ctx.roundRect(x - 1, labelY, textW + 12, labelH, 4);
+      ctx.fill();
+
+      ctx.fillStyle = '#fff';
+      ctx.fillText(label, x + 5, labelY + 15);
+    });
+  }
+
+  // Boot
+  loadModel();
+})();
+</script>
+</body>
+</html>
