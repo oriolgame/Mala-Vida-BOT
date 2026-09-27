@@ -187,14 +187,18 @@ async function main() {
       try { stats = await get(`${API}/getJsonWithMatchStats/${id}?currentSeason=true`); } catch {}
       await writeFile(path.join(RAW, `${id}.json`), JSON.stringify({ moves, stats }));
       const match = buildMatch(id, moves, stats);
-      if (!match.jugadas) { console.log(`- ${id}: sin jugadas todavía`); if (prevById[id]) partidos.push(prevById[id]); continue; }
+      if (!match.jugadas) {
+        console.log(`- ${id}: sin jugadas todavía`);
+        partidos.push(prevById[id]?.jugadas ? prevById[id] : { id, pendiente: true, equipos: [] });
+        continue;
+      }
       console.log(`- ${id}: ${match.equipos.map((e) => `${e.nombre} ${e.total.puntos}`).join(' vs ')} (${match.jugadas} jugadas)`);
       const unk = Object.keys(match.jugadasNoReconocidas);
       if (unk.length) console.log(`  jugadas no reconocidas: ${unk.slice(0, 15).join(' | ')}`);
       partidos.push(match);
     } catch (e) {
       console.warn(`- ${id}: error ${e.message}`);
-      if (prevById[id]) partidos.push(prevById[id]);
+      partidos.push(prevById[id] || { id, pendiente: true, equipos: [] });
     }
   }
 
@@ -205,6 +209,36 @@ async function main() {
     await writeFile(OUT, JSON.stringify(next, null, 1));
     console.log('Datos actualizados');
   } else console.log('Sin cambios');
+}
+
+// Añadir / quitar partidos desde una issue de GitHub (botones de la web).
+// Escribe en basquet/data/respuesta.md el mensaje que se contestará en la issue.
+async function issue() {
+  const title = norm(process.env.ISSUE_TITLE);
+  const text = `${process.env.ISSUE_TITLE || ''}\n${process.env.ISSUE_BODY || ''}`;
+  const ids = idsIn(text);
+  const file = path.join(DIR, 'config.json');
+  const config = JSON.parse(await readFile(file, 'utf8'));
+  config.partidos ||= [];
+  const has = (id) => config.partidos.some((p) => idsIn(p).includes(id));
+  let msg;
+  if (!ids.length) {
+    msg = 'No he encontrado ningún enlace de partido válido. Copia el enlace de la página de estadísticas del partido en basquetcatala.cat (acaba en un código de 24 letras y números).';
+  } else if (/^quitar|^eliminar|^borrar/.test(title)) {
+    const before = config.partidos.length;
+    config.partidos = config.partidos.filter((p) => !idsIn(p).some((i) => ids.includes(i)));
+    msg = before !== config.partidos.length ? `🗑️ Partido quitado (${ids.join(', ')}).` : 'Ese partido no estaba en la lista.';
+  } else {
+    const nuevos = ids.filter((id) => !has(id));
+    const links = text.match(/https?:\/\/\S+/g) || [];
+    for (const id of nuevos) config.partidos.push(links.find((l) => l.includes(id)) || id);
+    msg = nuevos.length
+      ? `✅ Partido añadido (${nuevos.join(', ')}). Las estadísticas aparecerán en la web en cuanto la FCBQ publique el jugada a jugada, y se actualizarán solas cada 10 minutos.`
+      : 'Ese partido ya estaba en la lista 👍';
+  }
+  await writeFile(file, JSON.stringify(config, null, 2) + '\n');
+  await writeFile(path.join(DIR, 'data', 'respuesta.md'), msg);
+  console.log(msg);
 }
 
 // Modo depuración: muestra qué devuelve cada URL (enlaces, ids, estructura JSON)
@@ -230,4 +264,4 @@ async function explorar(urls) {
   }
 }
 
-if (process.argv[1] === fileURLToPath(import.meta.url)) (process.argv[2] === '--explorar' ? explorar(process.argv.slice(3)) : main()).catch((e) => { console.error(e); process.exit(1); });
+if (process.argv[1] === fileURLToPath(import.meta.url)) (process.argv[2] === '--explorar' ? explorar(process.argv.slice(3)) : process.argv[2] === '--issue' ? issue() : main()).catch((e) => { console.error(e); process.exit(1); });
