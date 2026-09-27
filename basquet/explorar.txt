@@ -1,4 +1,14 @@
+https://msstats.optimalwayconsulting.com/v1/fcbq/get-current-match-stats-pdf/a9afd4ae-15c1-43fb-b514-d3985f3602b6
+https://msstats.optimalwayconsulting.com/v1/fcbq/get-current-match-stats/a9afd4ae-15c1-43fb-b514-d3985f3602b6
+https://msstats.optimalwayconsulting.com/v1/fcbq/get-current-match-moves/a9afd4ae-15c1-43fb-b514-d3985f3602b6
+https://msstats.optimalwayconsulting.com/v1/fcbq/get-match-moves/a9afd4ae-15c1-43fb-b514-d3985f3602b6
+https://msstats.optimalwayconsulting.com/v1/fcbq/get-match-stats/a9afd4ae-15c1-43fb-b514-d3985f3602b6
+https://msstats.optimalwayconsulting.com/v1/fcbq/get-json-with-match-moves/a9afd4ae-15c1-43fb-b514-d3985f3602b6
 https://msstats.optimalwayconsulting.com/v1/fcbq/getJsonWithMatchMoves/a9afd4ae-15c1-43fb-b514-d3985f3602b6
-https://msstats.optimalwayconsulting.com/v1/fcbq/getJsonWithMatchMoves/a9afd4ae-15c1-43fb-b514-d3985f3602b6?currentSeason=true
-https://msstats.optimalwayconsulting.com/v1/fcbq/getJsonWithMatchStats/a9afd4ae-15c1-43fb-b514-d3985f3602b6
-https://www.basquetcatala.cat/equip/73258
+https://msstats.optimalwayconsulting.com/v1/fcbq/getMatchMoves/a9afd4ae-15c1-43fb-b514-d3985f3602b6
+https://msstats.optimalwayconsulting.com/v1/fcbq/get-current-match-moves-json/a9afd4ae-15c1-43fb-b514-d3985f3602b6
+https://msstats.optimalwayconsulting.com/v1/fcbq/get-match/a9afd4ae-15c1-43fb-b514-d3985f3602b6
+https://msstats.optimalwayconsulting.com/v1/fcbq/get-current-match-stats-pdf/a9afd4ae-15c1-43fb-b514-d3985f3602b6?period=4
+https://msstats.optimalwayconsulting.com/
+https://msstats.optimalwayconsulting.com/v1/fcbq
+https://totbasquet.basquetcatala.cat/partit/estadistica/2024/67e984d119982b0001caf861

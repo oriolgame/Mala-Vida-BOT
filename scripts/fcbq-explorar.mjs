@@ -23,7 +23,7 @@ for (const url of urls) {
   try {
     if (/^https?:\/\/msstats/.test(url)) {
       const r = await ctx.request.get(url);
-      console.log(r.status(), (await r.text()).slice(0, 4000));
+      const b = await r.body(); console.log(r.status(), r.headers()['content-type'], b.length, 'bytes', /pdf/.test(r.headers()['content-type']||'') ? '' : b.toString().slice(0, 2500));
       continue;
     }
     await page.goto(url, { waitUntil: 'networkidle', timeout: 60000 });
