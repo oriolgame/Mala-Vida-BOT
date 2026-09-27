@@ -25,6 +25,12 @@ jobs:
           PY
           echo "===== contexto en el JS público"
           curl -sS -m 60 "https://totbasquet.basquetcatala.cat/main.js?v=20012027" -o main.js
-          for k in 'team-stats' 'head-to-head/past-games' 'match-day-between' 'getByTeamAllSeason' 'getMatchClubMonth' 'federated/'; do
-            echo "--- $k"; grep -o ".\{400\}$k.\{300\}" main.js | head -3
-          done
+          python3 - <<'PY'
+          t=open('main.js',encoding='utf-8',errors='ignore').read()
+          for k in ['team-stats','head-to-head/past-games','match-day-between','getByTeamAllSeason','getMatchClubMonth','/federated/']:
+              print('---',k); i=0; n=0
+              while n<3:
+                  i=t.find(k,i)
+                  if i<0: break
+                  print(t[max(0,i-500):i+300].replace('\n',' ')); print(); i+=len(k); n+=1
+          PY
