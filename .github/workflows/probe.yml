@@ -9,28 +9,24 @@ jobs:
     steps:
       - run: |
           B=https://bskt-stats.netlify.app
-          echo "===== estructura team-stats 88829/2026"
-          curl -sS -m 30 "$B/fcbq/team-stats/team/88829/season/2026" -o t.json
-          python3 - <<'PY'
-          import json
-          d=json.load(open('t.json'))
+          for p in "player-stats/federated/fbfcb946-98d0-11e9-a2a5-0216824770c2/team/88829" \
+                   "team-stats/team/88829/season/2026/playas/lo" "team-stats/team/88829/season/2026/playas/vs"; do
+            echo "===== $p"
+            curl -sS -m 30 "$B/fcbq/$p" -o r.json; wc -c < r.json
+            python3 - <<'PY'
+          import json,re
+          t=open('r.json').read()
+          try: d=json.loads(t)
+          except Exception: print(t[:500]); raise SystemExit
           def show(n,p='',depth=0):
-              if depth>3: return
+              if depth>4: return
               if isinstance(n,dict):
                   for k,v in n.items():
                       if isinstance(v,(dict,list)): print(p+k, type(v).__name__, len(v)); show(v,p+'  ',depth+1)
+                      elif depth<2: print(p+k,'=',str(v)[:80])
               elif isinstance(n,list) and n:
-                  print(p+'[0] keys:', list(n[0].keys()) if isinstance(n[0],dict) else n[0]); show(n[0],p+'  ',depth+1)
+                  print(p+'[0] =', json.dumps(n[0],ensure_ascii=False)[:1500]); show(n[0],p+'  ',depth+1)
           show(d)
+          print('ids 24hex/uuid:', sorted(set(re.findall(r'[0-9a-f]{24}|[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}',t)))[:20])
           PY
-          echo "===== contexto en el JS público"
-          curl -sS -m 60 "https://totbasquet.basquetcatala.cat/main.js?v=20012027" -o main.js
-          python3 - <<'PY'
-          t=open('main.js',encoding='utf-8',errors='ignore').read()
-          for k in ['team-stats','head-to-head/past-games','match-day-between','getByTeamAllSeason','getMatchClubMonth','/federated/']:
-              print('---',k); i=0; n=0
-              while n<3:
-                  i=t.find(k,i)
-                  if i<0: break
-                  print(t[max(0,i-500):i+300].replace('\n',' ')); print(); i+=len(k); n+=1
-          PY
+          done
