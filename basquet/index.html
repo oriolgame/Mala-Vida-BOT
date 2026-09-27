@@ -284,19 +284,22 @@ async function cargarEquipo(id) {
     const jugadores = (d.players || []).map(jugadorFCBQ);
     // Partido a partido: estadísticas de cada jugador en cada partido
     const partidos = {};
+    const sinDetalle = [];   // jugadores sin datos por partido (p. ej. nombres anonimizados por la FCBQ)
     await Promise.all((d.players || []).map(async (pl) => {
       try {
-        const ps = await fcbq(`player-stats/federated/${pl.uuid}/team/${id}`);
-        for (const ev of ps?.[id]?.evolutiveStats || []) {
+        const ps = pl.uuid ? await fcbq(`player-stats/federated/${pl.uuid}/team/${id}`) : null;
+        const evs = ps?.[id]?.evolutiveStats || [];
+        if (!evs.length) sinDetalle.push(pl.name);
+        for (const ev of evs) {
           const m = (partidos[ev.matchCallUuid] ??= { id: ev.matchCallUuid, fecha: ev.matchDay, rival: ev.opponentTeamName, jugadores: [] });
           m.jugadores.push({ ...jugadorFCBQ(ev), pj: undefined });
         }
-      } catch {}
+      } catch { sinDetalle.push(pl.name); }
     }));
     const lista = Object.values(partidos)
       .map((m) => ({ ...m, total: sumar(m.jugadores) }))
       .sort((a, b) => String(b.fecha).localeCompare(String(a.fecha)));
-    return (equipos[id] = { t: Date.now(), info: d.team, jugadores, total: sumar(jugadores), partidos: lista });
+    return (equipos[id] = { t: Date.now(), info: d.team, jugadores, total: sumar(jugadores), partidos: lista, sinDetalle });
   } catch {
     return prev || { t: Date.now(), vacio: true };
   }
@@ -326,7 +329,8 @@ function renderEquipo() {
         <span><b>vs ${esc(m.rival)}</b><small>${fechaCorta(m.fecha)}</small></span>
         <span class="pts">${m.total.puntos} pts ${abierto ? '▴' : '▾'}</span>
       </button>
-      ${abierto ? `<div style="margin-top:12px">${kpis(m.total)}<h2 style="margin-top:14px">Jugadores</h2>${table(m.jugadores, m.total, false)}</div>` : ''}
+      ${abierto ? `<div style="margin-top:12px">${kpis(m.total)}<h2 style="margin-top:14px">Jugadores</h2>${table(m.jugadores, m.total, false)}
+        ${d.sinDetalle.length ? `<p class="hint">No incluye a ${esc(d.sinDetalle.join(', '))}: la FCBQ no publica sus datos partido a partido (sí en la temporada).</p>` : ''}</div>` : ''}
     </div>`;
   }).join('');
   app.innerHTML = `
