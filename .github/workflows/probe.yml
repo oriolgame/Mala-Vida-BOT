@@ -1,0 +1,18 @@
+# Comprobación temporal de BSKT Stats en Netlify (solo en la rama de trabajo)
+name: Comprobar Netlify
+on:
+  push:
+    branches: ['claude/ecstatic-mccarthy-xfz3zj']
+jobs:
+  probe:
+    runs-on: ubuntu-latest
+    steps:
+      - run: |
+          B=https://bskt-stats.netlify.app
+          echo "===== Añadir equipo 88829"
+          curl -sS -m 30 -X POST -H 'content-type: application/json' -d '{"enlace":"https://www.basquetcatala.cat/equip/88829"}' "$B/api/partidos"; echo
+          for p in "/api/partidos" "/api/diagnostico" \
+                   "/fcbq/team-stats/team/88829/season/2026" "/fcbq/team-stats/team/88829/season/2025"; do
+            echo "===== $p"
+            curl -sS -m 30 "$B$p" | head -c 12000; echo
+          done
