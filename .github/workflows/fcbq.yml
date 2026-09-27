@@ -10,7 +10,6 @@ on:
         required: false
         default: ''
   push:
-    branches: [main, master]
     paths: ['basquet/**', 'scripts/fcbq-update.mjs', '.github/workflows/fcbq.yml', 'index.html']
 
 permissions:
@@ -22,6 +21,8 @@ concurrency:
 
 jobs:
   update:
+    # Solo en la rama principal del repositorio
+    if: github.ref_name == github.event.repository.default_branch
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4

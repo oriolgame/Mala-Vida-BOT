@@ -4,7 +4,7 @@ Web gratuita (GitHub Pages) que lee el **jugada a jugada** de basquetcatala.cat 
 puntos, canastas de 2, triples, tiros libres, faltas (y rebotes, asistencias, etc. si vienen).
 
 ## Puesta en marcha (una sola vez)
-1. Mezcla esta rama en `main`.
+1. Mezcla esta rama en la rama principal del repositorio.
 2. GitHub → **Settings → Pages → Source: Deploy from a branch → `gh-pages`** (normalmente se activa solo).
 3. Edita `basquet/config.json` y pega el enlace de la página de tu equipo en basquetcatala.cat
    (y/o enlaces de partidos concretos).
