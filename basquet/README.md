@@ -1,20 +1,20 @@
 # BSKT Stats
 
-Web gratuita que cuenta puntos, canastas de 2, triples, tiros libres y faltas (y rebotes,
-asistencias… si vienen) a partir del **jugada a jugada** de basquetcatala.cat.
-
-**Web:** https://oriolgame.github.io/Mala-Vida-BOT/
+Web gratuita (Netlify) que cuenta puntos, canastas de 2, triples, tiros libres y faltas
+(y rebotes, asistencias… si vienen) a partir del **jugada a jugada** de basquetcatala.cat.
 
 ## Cómo se usa
-1. Abre el partido en basquetcatala.cat y copia el enlace.
-2. En la web, pégalo y pulsa **＋ Añadir** → se abre GitHub con todo rellenado → pulsa **Create**.
-3. Listo: GitHub Actions lo guarda, y cada 10 minutos actualiza las estadísticas solo.
+Pega en la web el enlace de:
+- **un equipo** (`https://www.basquetcatala.cat/equip/…`) → se buscan sus partidos jugados y por jugar, o
+- **un partido** (`https://www.basquetcatala.cat/estadistiques/…`).
 
-Para quitar un partido, pulsa 🗑️ junto al selector.
+Todo se actualiza solo cada minuto mientras tienes la web abierta.
 
 ## Cómo funciona por dentro
-- `scripts/fcbq-update.mjs` descarga el jugada a jugada y genera `basquet/data/partidos.json`.
-- `.github/workflows/fcbq.yml` se ejecuta cada 10 minutos, al abrir una issue desde la web
-  (solo las del propietario/colaboradores) y en cada cambio; publica la web en la rama `gh-pages`.
-- Las páginas de equipo de basquetcatala.cat están protegidas con reCAPTCHA, por eso los partidos
-  se añaden por enlace.
+- `basquet/` es la web; `basquet/fcbq.js` convierte el jugada a jugada en estadísticas.
+- `netlify/functions/partidos.mjs` guarda la lista de partidos y equipos en Netlify Blobs (`/api/partidos`).
+- `netlify.toml` hace de proxy de `/fcbq/*` al servidor de estadísticas de la FCBQ,
+  así el navegador lee los datos en directo sin problemas de CORS.
+- Opcional: define la variable de entorno `EDIT_PIN` en Netlify para que añadir/quitar pida un PIN.
+- Las páginas de basquetcatala.cat están protegidas con reCAPTCHA; los partidos de un equipo
+  se buscan con la función `team-stats` del servidor de estadísticas (experimental).

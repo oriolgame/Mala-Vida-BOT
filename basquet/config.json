@@ -1,5 +1,0 @@
-{
-  "_ayuda": "Pega en 'partidos' el enlace de cada partido de basquetcatala.cat (ej: https://www.basquetcatala.cat/estadistiques/2026/xxxxxxxxxxxxxxxxxxxxxxxx). Las estadísticas se actualizan solas cada 10 minutos. 'equipos' (páginas de equipo) no funciona de momento: la FCBQ las protege con reCAPTCHA.",
-  "equipos": [],
-  "partidos": []
-}

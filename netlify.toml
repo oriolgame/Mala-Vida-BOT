@@ -1,0 +1,15 @@
+# BSKT Stats en Netlify
+[build]
+  publish = "basquet"
+  functions = "netlify/functions"
+  # El contador de personas sigue disponible en /contador/
+  command = "mkdir -p basquet/contador && cp index.html basquet/contador/index.html"
+
+# El jugada a jugada de la FCBQ pasa por Netlify (mismo dominio, sin problemas de CORS).
+# El proxy se ejecuta en el nodo de Netlify más cercano a quien abre la web.
+[[redirects]]
+  from = "/fcbq/*"
+  to = "https://msstats.optimalwayconsulting.com/v1/fcbq/:splat"
+  status = 200
+  force = true
+  headers = { Referer = "https://www.basquetcatala.cat/" }

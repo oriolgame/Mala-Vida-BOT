@@ -1,2 +1,3 @@
-basquet/data/raw/
-basquet/data/respuesta.md
+node_modules/
+basquet/contador/
+.netlify/

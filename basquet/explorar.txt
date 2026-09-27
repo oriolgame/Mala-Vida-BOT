@@ -1,7 +1,0 @@
-https://msstats.optimalwayconsulting.com/v1/fcbq/team-stats/73258/season/2025
-https://msstats.optimalwayconsulting.com/v1/fcbq/team-stats/team/73258/season/2025
-https://msstats.optimalwayconsulting.com/v1/fcbq/team-stats?teamId=73258/season/2025
-https://msstats.optimalwayconsulting.com/v1/fcbq/team-stats/73258/season/2026
-https://msstats.optimalwayconsulting.com/v1/fcbq/team-stats/team/73258/season/2026
-https://msstats.optimalwayconsulting.com/v1/fcbq/team-stats?teamId=73258/season/2026
-https://msstats.optimalwayconsulting.com/v1/fcbq/team-stats
