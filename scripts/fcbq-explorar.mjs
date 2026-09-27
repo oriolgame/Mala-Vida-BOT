@@ -22,7 +22,8 @@ for (const url of urls) {
   });
   try {
     if (/^https?:\/\/msstats/.test(url)) {
-      const r = await ctx.request.get(url);
+      const r = await ctx.request.get(url, { headers: { Origin: 'https://oriolgame.github.io' } });
+      console.log('cabeceras:', JSON.stringify(r.headers()));
       const b = await r.body(); console.log(r.status(), r.headers()['content-type'], b.length, 'bytes', /pdf/.test(r.headers()['content-type']||'') ? '' : b.toString().slice(0, 6000));
       continue;
     }

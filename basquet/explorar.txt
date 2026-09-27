@@ -1,4 +1,1 @@
-https://msstats.optimalwayconsulting.com/v1/fcbq/getJsonWithMatchMoves/69a43ead5213ba0001ee1978?currentSeason=false
-https://msstats.optimalwayconsulting.com/v1/fcbq/getJsonWithMatchStats/69a43ead5213ba0001ee1978?currentSeason=false
-https://msstats.optimalwayconsulting.com/v1/fcbq/getJsonWithMatchMoves/69a43ead5213ba0001ee1978
-https://totbasquet.basquetcatala.cat/partit/estadistica/2025/69a43ead5213ba0001ee1978
+https://msstats.optimalwayconsulting.com/v1/fcbq/getJsonWithMatchMoves/69a43ead5213ba0001ee1978?currentSeason=true
