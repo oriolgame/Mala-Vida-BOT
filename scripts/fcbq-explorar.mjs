@@ -21,6 +21,16 @@ for (const url of urls) {
     reqs.push(`${r.status()} ${r.request().method()} ${u}${extra}`);
   });
   try {
+    if (/\.js(\?|$)/.test(url)) {
+      // Código JS público: lista las llamadas a APIs que contiene
+      const t = await (await ctx.request.get(url)).text();
+      console.log(t.length, 'bytes');
+      const hits = new Set();
+      for (const m of t.matchAll(/["'`]([^"'`\s]*(?:msstats|optimalway|\/v1\/|getJson|get[A-Z]\w+By\w+|\/api\/)[^"'`\s]*)["'`]/g)) hits.add(m[1]);
+      for (const m of t.matchAll(/\b(get[A-Z]\w{4,60})\b/g)) hits.add(m[1]);
+      console.log([...hits].slice(0, 300).join('\n  '));
+      continue;
+    }
     if (/^https?:\/\/msstats/.test(url)) {
       const r = await ctx.request.get(url, { headers: { Origin: 'https://oriolgame.github.io' } });
       console.log('cabeceras:', JSON.stringify(r.headers()));
