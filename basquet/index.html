@@ -32,6 +32,15 @@
     tr.tot td { font-weight: 700; border-top: 2px solid var(--line); }
     td.pts { color: var(--accent); font-weight: 700; }
     .f5 { color: #ff5c5c; font-weight: 700; }
+    .add { display: flex; gap: 8px; }
+    .add input { flex: 1; min-width: 0; font: inherit; color: var(--text); background: var(--bg); border: 1px solid var(--line); border-radius: 8px; padding: 10px 12px; }
+    .add button { background: var(--accent); border-color: var(--accent); color: #111; font-weight: 700; white-space: nowrap; }
+    .hint { color: var(--muted); font-size: .8rem; margin-top: 8px; line-height: 1.5; }
+    .hint.err { color: #ff5c5c; }
+    .row { display: flex; gap: 8px; align-items: center; }
+    .row select { flex: 1; min-width: 0; }
+    .btn-del { color: var(--muted); padding: 8px 10px; }
+    .pend { color: var(--muted); text-align: center; padding: 18px 8px; line-height: 1.6; }
     .empty { color: var(--muted); text-align: center; padding: 30px 10px; line-height: 1.6; }
   </style>
 </head>
@@ -47,6 +56,14 @@
     <button data-m="temporada">Temporada (acumulado)</button>
   </div>
 
+  <div class="card">
+    <form class="add" id="addForm">
+      <input id="addUrl" placeholder="Pega aquí el enlace del partido (basquetcatala.cat)" autocomplete="off" />
+      <button type="submit">＋ Añadir</button>
+    </form>
+    <p class="hint" id="addHint">Abre el partido en basquetcatala.cat, copia el enlace de la barra del navegador y pégalo aquí.</p>
+  </div>
+
   <div id="app"></div>
 </main>
 
@@ -57,8 +74,38 @@ const COLS = [
   ['rebotes', 'REB'], ['asistencias', 'AST'], ['robos', 'ROB'], ['perdidas', 'PER'], ['tapones', 'TAP'],
 ];
 const SUM = ['puntos','t1','t1i','t2','t2i','t3','t3i','faltas','tecnicas','antideportivas','faltasRecibidas','rebotes','asistencias','robos','perdidas','tapones'];
-let data = { partidos: [] }, mode = 'partido', matchIdx = 0, teamIdx = 0, sortKey = 'puntos', sortDir = -1;
+let data = null, mode = 'partido', matchIdx = 0, teamIdx = 0, sortKey = 'puntos', sortDir = -1;
 const app = document.getElementById('app');
+// Repositorio de GitHub donde vive la web (sale de la URL de GitHub Pages)
+const REPO = location.hostname.endsWith('github.io')
+  ? `${location.hostname.split('.')[0]}/${location.pathname.split('/')[1]}`
+  : 'oriolgame/Mala-Vida-BOT';
+const ID_RE = /[0-9a-f]{24}|[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}/i;
+// Añadir / quitar se hace abriendo una issue ya rellenada; GitHub Actions hace el resto
+function openIssue(title, body) {
+  const u = `https://github.com/${REPO}/issues/new?title=${encodeURIComponent(title)}&body=${encodeURIComponent(body)}`;
+  window.open(u, '_blank');
+}
+document.getElementById('addForm').onsubmit = (ev) => {
+  ev.preventDefault();
+  const v = document.getElementById('addUrl').value.trim();
+  const hint = document.getElementById('addHint');
+  const id = (v.match(ID_RE) || [])[0];
+  if (!id) {
+    hint.className = 'hint err';
+    hint.textContent = 'Ese enlace no parece de un partido. Debe acabar en un código largo de letras y números (ej: …/estadistiques/2026/69a43ead5213ba0001ee1978).';
+    return;
+  }
+  if ((data?.partidos || []).some((p) => p.id === id.toLowerCase())) {
+    hint.className = 'hint';
+    hint.textContent = 'Ese partido ya está en la lista 👍';
+    return;
+  }
+  openIssue('Añadir partido', v);
+  hint.className = 'hint';
+  hint.innerHTML = 'Se ha abierto GitHub con todo rellenado: solo pulsa <b>“Create”</b>. En 1-2 minutos el partido aparecerá aquí.';
+  document.getElementById('addUrl').value = '';
+};
 const esc = (s) => String(s ?? '').replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
 
 function cell(p, k) {
@@ -100,9 +147,22 @@ function renderMatch() {
   const m = ps[matchIdx];
   const [a, b] = m.equipos;
   const e = m.equipos[teamIdx] || a;
-  const label = (p) => p.equipos.map((x) => `${x.nombre} ${x.total.puntos}`).join(' – ');
+  const label = (p) => p.equipos.length ? p.equipos.map((x) => `${x.nombre} ${x.total.puntos}`).join(' – ') : `⏳ Partido pendiente (${p.id.slice(-6)})`;
+  const selector = `<div class="card row"><select id="sel">${ps.map((p, i) => `<option value="${i}" ${i === matchIdx ? 'selected' : ''}>${esc(label(p))}</option>`).join('')}</select>
+    <button class="btn-del" id="del" title="Quitar este partido">🗑️</button></div>`;
+  const bind = () => {
+    document.getElementById('sel').onchange = (ev) => { matchIdx = +ev.target.value; teamIdx = 0; render(); };
+    document.getElementById('del').onclick = () => {
+      if (confirm('¿Quitar este partido de la web?')) openIssue('Quitar partido', m.id);
+    };
+  };
+  if (!m.equipos.length) {
+    app.innerHTML = selector + `<div class="card pend">⏳ Este partido aún no tiene jugada a jugada publicado por la FCBQ.<br>En cuanto empiece, las estadísticas aparecerán aquí solas (se revisa cada 10 minutos).</div>`;
+    bind();
+    return;
+  }
   app.innerHTML = `
-    <div class="card"><select id="sel">${ps.map((p, i) => `<option value="${i}" ${i === matchIdx ? 'selected' : ''}>${esc(label(p))}</option>`).join('')}</select></div>
+    ${selector}
     <div class="card">
       <div class="score">
         <div><div class="n">${a?.total.puntos ?? 0}</div><div class="t">${esc(a?.nombre)}</div></div>
@@ -115,7 +175,7 @@ function renderMatch() {
       ${kpis(e.total)}
     </div>
     <div class="card"><h2>Jugadores · ${esc(e.nombre)}</h2>${table(e.jugadores, e.total, false)}</div>`;
-  document.getElementById('sel').onchange = (ev) => { matchIdx = +ev.target.value; teamIdx = 0; render(); };
+  bind();
 }
 
 function renderSeason() {
@@ -133,15 +193,17 @@ function renderSeason() {
   }
   const list = Object.values(teams).sort((a, b) => b.pj - a.pj);
   const t = list[teamIdx] || list[0];
+  if (!t) { app.innerHTML = `<div class="card pend">⏳ Todavía no hay partidos con estadísticas.</div>`; return; }
   app.innerHTML = `
     <div class="card">${teamTabs(list.map((x) => `${x.nombre} (${x.pj})`))}${kpis(t.total)}</div>
     <div class="card"><h2>Temporada · ${esc(t.nombre)} · ${t.pj} partidos</h2>${table(Object.values(t.jug), t.total, true)}</div>`;
 }
 
 function render() {
+  if (!data) return;
   document.querySelectorAll('#modes button').forEach((b) => b.classList.toggle('on', b.dataset.m === mode));
   if (!data.partidos.length) {
-    app.innerHTML = `<div class="card empty">Todavía no hay partidos.<br>Añade el enlace de tu equipo o de un partido en <b>basquet/config.json</b> y en unos minutos aparecerán aquí solos.</div>`;
+    app.innerHTML = `<div class="card empty">🏀 Todavía no hay partidos.<br>Pega arriba el enlace de un partido y pulsa <b>＋ Añadir</b>.<br>A partir de ahí todo se actualiza solo.</div>`;
     return;
   }
   mode === 'partido' ? renderMatch() : renderSeason();
@@ -167,6 +229,7 @@ async function load() {
       : 'Se actualiza automáticamente desde el jugada a jugada de la FCBQ';
     if (changed) render();
   } catch (e) {
+    if (!data) { data = { partidos: [] }; render(); }
     document.getElementById('upd').textContent = 'No se pudieron cargar los datos';
   }
 }
