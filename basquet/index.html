@@ -41,6 +41,11 @@
     .row select { flex: 1; min-width: 0; }
     .btn-del { color: var(--muted); padding: 8px 10px; }
     .pend { color: var(--muted); text-align: center; padding: 18px 8px; line-height: 1.6; }
+    .chips { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 10px; }
+    .chips:empty { display: none; }
+    .chip { display: inline-flex; align-items: center; gap: 6px; background: var(--bg); border: 1px solid var(--line); border-radius: 999px; padding: 4px 6px 4px 12px; font-size: .82rem; }
+    .chip small { color: var(--muted); }
+    .chip button { border: 0; background: none; padding: 2px 6px; color: var(--muted); }
     .empty { color: var(--muted); text-align: center; padding: 30px 10px; line-height: 1.6; }
   </style>
 </head>
@@ -58,16 +63,19 @@
 
   <div class="card">
     <form class="add" id="addForm">
-      <input id="addUrl" placeholder="Pega aquí el enlace del partido (basquetcatala.cat)" autocomplete="off" />
+      <input id="addUrl" placeholder="Enlace de un partido o de un equipo" autocomplete="off" />
       <button type="submit">＋ Añadir</button>
     </form>
-    <p class="hint" id="addHint">Abre el partido en basquetcatala.cat, copia el enlace de la barra del navegador y pégalo aquí.</p>
+    <p class="hint" id="addHint">Copia de basquetcatala.cat el enlace de un <b>partido</b> (…/estadistica/partit/…) o de un <b>equipo</b> (…/equip/…) y pégalo aquí.</p>
+    <div class="chips" id="equipos"></div>
   </div>
 
   <div id="app"></div>
 </main>
 
-<script>
+<script type="module">
+import { buildMatch, idsIn, temporadaActual } from './fcbq.js';
+
 const COLS = [
   ['dorsal', '#'], ['nombre', 'Jugador'], ['pj', 'PJ'], ['puntos', 'PTS'],
   ['t2', 'T2'], ['t3', 'Triples'], ['t1', 'TL'], ['faltas', 'Faltas'],
@@ -76,36 +84,55 @@ const COLS = [
 const SUM = ['puntos','t1','t1i','t2','t2i','t3','t3i','faltas','tecnicas','antideportivas','faltasRecibidas','rebotes','asistencias','robos','perdidas','tapones'];
 let data = null, mode = 'partido', matchIdx = 0, teamIdx = 0, sortKey = 'puntos', sortDir = -1;
 const app = document.getElementById('app');
-// Repositorio de GitHub donde vive la web (sale de la URL de GitHub Pages)
-const REPO = location.hostname.endsWith('github.io')
-  ? `${location.hostname.split('.')[0]}/${location.pathname.split('/')[1]}`
-  : 'oriolgame/Mala-Vida-BOT';
-const ID_RE = /[0-9a-f]{24}|[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}/i;
-// Añadir / quitar se hace abriendo una issue ya rellenada; GitHub Actions hace el resto
-function openIssue(title, body) {
-  const u = `https://github.com/${REPO}/issues/new?title=${encodeURIComponent(title)}&body=${encodeURIComponent(body)}`;
-  window.open(u, '_blank');
+let lista = { partidos: [], equipos: [] };
+const cache = {};            // id → partido calculado (se reutiliza entre refrescos)
+const estadoEquipo = {};     // id de equipo → nº de partidos encontrados
+const hint = document.getElementById('addHint');
+const say = (html, err) => { hint.className = err ? 'hint err' : 'hint'; hint.innerHTML = html; };
+
+// API propia (Netlify Function). Si hay PIN configurado, se pide una vez y se recuerda.
+async function api(method, { body, qs = '' } = {}) {
+  let pin = '';
+  try { pin = localStorage.getItem('bskt-pin') || ''; } catch {}
+  const r = await fetch('/api/partidos' + qs, { method, headers: { 'content-type': 'application/json', 'x-pin': pin }, body: body && JSON.stringify(body) });
+  if (r.status === 401) {
+    const nuevo = prompt('Introduce el PIN para editar la lista:');
+    if (!nuevo) throw new Error('Hace falta el PIN para editar.');
+    try { localStorage.setItem('bskt-pin', nuevo); } catch {}
+    return api(method, { body, qs });
+  }
+  const d = await r.json();
+  if (!r.ok) throw new Error(d.error || 'Error ' + r.status);
+  return d;
 }
-document.getElementById('addForm').onsubmit = (ev) => {
+
+document.getElementById('addForm').onsubmit = async (ev) => {
   ev.preventDefault();
-  const v = document.getElementById('addUrl').value.trim();
-  const hint = document.getElementById('addHint');
-  const id = (v.match(ID_RE) || [])[0];
-  if (!id) {
-    hint.className = 'hint err';
-    hint.textContent = 'Ese enlace no parece de un partido. Debe acabar en un código largo de letras y números (ej: …/estadistiques/2026/69a43ead5213ba0001ee1978).';
-    return;
-  }
-  if ((data?.partidos || []).some((p) => p.id === id.toLowerCase())) {
-    hint.className = 'hint';
-    hint.textContent = 'Ese partido ya está en la lista 👍';
-    return;
-  }
-  openIssue('Añadir partido', v);
-  hint.className = 'hint';
-  hint.innerHTML = 'Se ha abierto GitHub con todo rellenado: solo pulsa <b>“Create”</b>. En 1-2 minutos el partido aparecerá aquí.';
-  document.getElementById('addUrl').value = '';
+  const input = document.getElementById('addUrl');
+  const enlace = input.value.trim();
+  if (!enlace) return;
+  say('Añadiendo…');
+  try {
+    const d = await api('POST', { body: { enlace } });
+    lista = d.lista;
+    input.value = '';
+    if (d.tipo === 'equipo') say(d.nuevos.length ? '✅ Equipo añadido. Buscando sus partidos…' : 'Ese equipo ya lo sigues 👍');
+    else say(d.nuevos.length ? '✅ Partido añadido.' : 'Ese partido ya estaba en la lista 👍');
+    if (d.nuevos.length && d.tipo === 'partido') matchIdx = 0;
+    await refresh();
+    if (d.tipo === 'equipo' && d.nuevos.length) {
+      const n = estadoEquipo[d.nuevos[0]] || 0;
+      say(n ? `✅ Equipo añadido: ${n} partidos encontrados. Se actualizan solos.` : '✅ Equipo añadido. La FCBQ aún no da partidos suyos; los iré buscando cada minuto.');
+    }
+  } catch (e) { say(esc(e.message), true); }
 };
+
+async function quitar(id, que) {
+  if (!confirm(`¿Quitar este ${que}?`)) return;
+  try { lista = (await api('DELETE', { qs: '?id=' + encodeURIComponent(id) })).lista; matchIdx = 0; await refresh(); }
+  catch (e) { say(esc(e.message), true); }
+}
+
 const esc = (s) => String(s ?? '').replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
 
 function cell(p, k) {
@@ -147,17 +174,17 @@ function renderMatch() {
   const m = ps[matchIdx];
   const [a, b] = m.equipos;
   const e = m.equipos[teamIdx] || a;
-  const label = (p) => p.equipos.length ? p.equipos.map((x) => `${x.nombre} ${x.total.puntos}`).join(' – ') : `⏳ Partido pendiente (${p.id.slice(-6)})`;
+  const label = (p) => p.equipos.length ? p.equipos.map((x) => `${x.nombre} ${x.total.puntos}`).join(' – ') : `⏳ Pendiente de jugar (${p.id.slice(-6)})`;
   const selector = `<div class="card row"><select id="sel">${ps.map((p, i) => `<option value="${i}" ${i === matchIdx ? 'selected' : ''}>${esc(label(p))}</option>`).join('')}</select>
     <button class="btn-del" id="del" title="Quitar este partido">🗑️</button></div>`;
   const bind = () => {
     document.getElementById('sel').onchange = (ev) => { matchIdx = +ev.target.value; teamIdx = 0; render(); };
     document.getElementById('del').onclick = () => {
-      if (confirm('¿Quitar este partido de la web?')) openIssue('Quitar partido', m.id);
+      quitar(m.id, m.deEquipo && !m.manual ? 'partido (volverá a aparecer si sigues a su equipo)' : 'partido');
     };
   };
   if (!m.equipos.length) {
-    app.innerHTML = selector + `<div class="card pend">⏳ Este partido aún no tiene jugada a jugada publicado por la FCBQ.<br>En cuanto empiece, las estadísticas aparecerán aquí solas (se revisa cada 10 minutos).</div>`;
+    app.innerHTML = selector + `<div class="card pend">⏳ Este partido aún no tiene jugada a jugada publicado por la FCBQ.<br>En cuanto empiece, las estadísticas aparecerán aquí solas (se revisa cada minuto).</div>`;
     bind();
     return;
   }
@@ -203,7 +230,9 @@ function render() {
   if (!data) return;
   document.querySelectorAll('#modes button').forEach((b) => b.classList.toggle('on', b.dataset.m === mode));
   if (!data.partidos.length) {
-    app.innerHTML = `<div class="card empty">🏀 Todavía no hay partidos.<br>Pega arriba el enlace de un partido y pulsa <b>＋ Añadir</b>.<br>A partir de ahí todo se actualiza solo.</div>`;
+    app.innerHTML = lista.equipos.length
+      ? `<div class="card empty">🔎 Siguiendo ${lista.equipos.length === 1 ? 'a tu equipo' : 'a tus equipos'}, pero la FCBQ todavía no ha publicado partidos suyos.<br>Mientras tanto puedes añadir partidos pegando su enlace.</div>`
+      : `<div class="card empty">🏀 Todavía no hay partidos.<br>Pega arriba el enlace de un partido o de tu equipo y pulsa <b>＋ Añadir</b>.<br>A partir de ahí todo se actualiza solo.</div>`;
     return;
   }
   mode === 'partido' ? renderMatch() : renderSeason();
@@ -217,24 +246,87 @@ function render() {
 
 document.querySelectorAll('#modes button').forEach((b) => (b.onclick = () => { mode = b.dataset.m; teamIdx = 0; render(); }));
 
-async function load() {
+function renderEquipos() {
+  document.getElementById('equipos').innerHTML = lista.equipos.map((e) => {
+    const n = estadoEquipo[e.id];
+    const info = n == null ? 'buscando…' : n ? `${n} partidos` : 'sin partidos aún';
+    return `<span class="chip">👥 Equipo ${esc(e.id)} <small>${info}</small><button data-eq="${esc(e.id)}" title="Dejar de seguir">✕</button></span>`;
+  }).join('');
+  document.querySelectorAll('[data-eq]').forEach((b) => (b.onclick = () => quitar(b.dataset.eq, 'equipo')));
+}
+
+// Lee un JSON del servidor de estadísticas de la FCBQ (a través del proxy de Netlify)
+async function fcbq(path) {
+  const r = await fetch('/fcbq/' + path, { cache: 'no-store' });
+  if (!r.ok) throw new Error(r.status);
+  return r.json();
+}
+
+// Partidos de un equipo (función de la FCBQ «team-stats», experimental)
+async function partidosDeEquipo(id) {
   try {
-    const r = await fetch('data/partidos.json?t=' + Date.now(), { cache: 'no-store' });
-    const d = await r.json();
-    const changed = JSON.stringify(d) !== JSON.stringify(data);
-    data = d;
-    if (matchIdx >= data.partidos.length) matchIdx = 0;
-    document.getElementById('upd').textContent = data.actualizado
-      ? 'Actualizado: ' + new Date(data.actualizado).toLocaleString('es-ES') + ' · se refresca solo'
-      : 'Se actualiza automáticamente desde el jugada a jugada de la FCBQ';
-    if (changed) render();
-  } catch (e) {
-    if (!data) { data = { partidos: [] }; render(); }
-    document.getElementById('upd').textContent = 'No se pudieron cargar los datos';
+    const d = await fcbq(`team-stats/team/${id}/season/${temporadaActual()}`);
+    return idsIn(JSON.stringify(d));
+  } catch { return []; }
+}
+
+async function cargarPartido(id) {
+  // Un partido terminado no cambia: si ya lo tenemos y no se ha movido en 3 h, no se vuelve a pedir
+  const prev = cache[id];
+  if (prev?.jugadas && Date.now() - prev.cambio > 3 * 3600e3) return prev;
+  try {
+    const [moves, stats] = await Promise.all([
+      fcbq(`getJsonWithMatchMoves/${id}?currentSeason=true`),
+      fcbq(`getJsonWithMatchStats/${id}?currentSeason=true`).catch(() => null),
+    ]);
+    const m = buildMatch(id, moves, stats);
+    if (!m.jugadas) return { id, pendiente: true, equipos: [] };
+    m.cambio = prev && prev.jugadas === m.jugadas ? prev.cambio : Date.now();
+    return (cache[id] = m);
+  } catch {
+    return prev || { id, pendiente: true, equipos: [] };
   }
 }
+
+let refrescando = null;
+async function refresh() {
+  if (refrescando) return refrescando;
+  refrescando = (async () => {
+    renderEquipos();
+    const manual = new Set(lista.partidos.map((p) => p.id));
+    const deEquipo = new Set();
+    await Promise.all(lista.equipos.map(async (e) => {
+      const ids = await partidosDeEquipo(e.id);
+      estadoEquipo[e.id] = ids.length;
+      ids.forEach((i) => deEquipo.add(i));
+    }));
+    renderEquipos();
+    const ids = [...new Set([...manual, ...deEquipo])];
+    const partidos = await Promise.all(ids.map(cargarPartido));
+    partidos.forEach((p) => { p.manual = manual.has(p.id); p.deEquipo = deEquipo.has(p.id); });
+    // Primero los que tienen datos (más recientes arriba), después los pendientes
+    partidos.sort((a, b) => (b.jugadas ? 1 : 0) - (a.jugadas ? 1 : 0));
+    const sel = data?.partidos[matchIdx]?.id;
+    data = { partidos };
+    const i = partidos.findIndex((p) => p.id === sel);
+    matchIdx = i >= 0 ? i : 0;
+    document.getElementById('upd').textContent = 'En directo desde la FCBQ · actualizado a las ' + new Date().toLocaleTimeString('es-ES', { hour: '2-digit', minute: '2-digit' });
+    render();
+  })().finally(() => (refrescando = null));
+  return refrescando;
+}
+
+async function load() {
+  try {
+    lista = await api('GET');
+  } catch {
+    document.getElementById('upd').textContent = 'No se pudo cargar la lista de partidos';
+  }
+  await refresh();
+}
 load();
-setInterval(load, 60000);
+setInterval(refresh, 60000);
+setInterval(async () => { try { lista = await api('GET'); } catch {} }, 5 * 60000);
 </script>
 </body>
 </html>
