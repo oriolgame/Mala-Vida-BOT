@@ -8,6 +8,11 @@ import { idsIn, equipoId } from '../../basquet/fcbq.js';
 
 const KEY = 'lista';
 const vacia = () => ({ partidos: [], equipos: [] });
+// Lista inicial la primera vez (partido añadido con la versión anterior de la web)
+const SEMILLA = {
+  partidos: [{ id: '2b5cd3f4-2158-4ada-a4d6-ec5bbbc4080f', url: 'https://www.basquetcatala.cat/estadistica/partit/2b5cd3f4-2158-4ada-a4d6-ec5bbbc4080f' }],
+  equipos: [],
+};
 const json = (body, status = 200) =>
   new Response(JSON.stringify(body), { status, headers: { 'content-type': 'application/json', 'cache-control': 'no-store' } });
 
@@ -15,7 +20,7 @@ const json = (body, status = 200) =>
 const store = () => globalThis.__bsktStore || getStore('bskt-stats');
 
 async function leer() {
-  return { ...vacia(), ...((await store().get(KEY, { type: 'json' })) || {}) };
+  return { ...vacia(), ...((await store().get(KEY, { type: 'json' })) || SEMILLA) };
 }
 
 export default async (req) => {
@@ -41,7 +46,7 @@ export default async (req) => {
       await store().setJSON(KEY, lista);
       return json({ ok: true, tipo: 'equipo', nuevos: nuevo ? [eq] : [], lista });
     }
-    return json({ error: 'No reconozco el enlace. Pega el enlace de un partido (…/estadistiques/…) o de un equipo (…/equip/…) de basquetcatala.cat.' }, 400);
+    return json({ error: 'No reconozco el enlace. Pega el enlace de un partido (…/estadistica/partit/…) o de un equipo (…/equip/…) de basquetcatala.cat.' }, 400);
   }
 
   if (req.method === 'DELETE') {

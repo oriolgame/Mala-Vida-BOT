@@ -6,7 +6,7 @@ Web gratuita (Netlify) que cuenta puntos, canastas de 2, triples, tiros libres y
 ## Cómo se usa
 Pega en la web el enlace de:
 - **un equipo** (`https://www.basquetcatala.cat/equip/…`) → se buscan sus partidos jugados y por jugar, o
-- **un partido** (`https://www.basquetcatala.cat/estadistiques/…`).
+- **un partido** (`https://www.basquetcatala.cat/estadistica/partit/…`).
 
 Todo se actualiza solo cada minuto mientras tienes la web abierta.
 
