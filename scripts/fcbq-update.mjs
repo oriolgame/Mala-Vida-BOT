@@ -12,7 +12,7 @@ const RAW = path.join(DIR, 'data', 'raw');
 
 const API = 'https://msstats.optimalwayconsulting.com/v1/fcbq';
 const HEADERS = {
-  'User-Agent': 'Mozilla/5.0 (compatible; mala-vida-stats/1.0)',
+  'User-Agent': 'Mozilla/5.0 (compatible; bskt-stats/1.0)',
   Accept: 'application/json, text/html;q=0.9, */*;q=0.8',
   Referer: 'https://www.basquetcatala.cat/',
 };
