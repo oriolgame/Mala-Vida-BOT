@@ -1,0 +1,90 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>BSKT Stats · Diagnóstico</title>
+  <style>
+    :root { --bg:#0f0f13; --card:#1a1a22; --line:#2a2a36; --text:#e8e8f0; --muted:#8a8a9a; --accent:#ff7a1a; --ok:#3ecf8e; --bad:#ff5c5c; }
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body { font-family: 'Segoe UI', system-ui, sans-serif; background: var(--bg); color: var(--text); padding: 20px 16px 40px; }
+    main { max-width: 700px; margin: 0 auto; display: flex; flex-direction: column; gap: 14px; }
+    h1 { font-size: 1.4rem; } h1 span { color: var(--accent); }
+    p { color: var(--muted); line-height: 1.5; }
+    .card { background: var(--card); border: 1px solid var(--line); border-radius: 12px; padding: 14px; }
+    #estado { font-size: 1.1rem; font-weight: 600; }
+    ul { list-style: none; display: flex; flex-direction: column; gap: 6px; font-size: .85rem; }
+    li { display: flex; gap: 8px; justify-content: space-between; border-bottom: 1px solid var(--line); padding-bottom: 6px; }
+    li span:first-child { color: var(--muted); overflow-wrap: anywhere; }
+    .ok { color: var(--ok); } .vacio { color: var(--muted); } .bad { color: var(--bad); }
+    a { color: var(--accent); }
+  </style>
+</head>
+<body>
+<main>
+  <h1>🏀 BSKT <span>Stats</span> · Diagnóstico</h1>
+  <p>Esta página comprueba desde tu conexión si el servidor de estadísticas de la FCBQ responde, y envía el resultado para que Claude lo revise. No tienes que hacer nada: espera a que ponga «Listo».</p>
+  <div class="card"><div id="estado">⏳ Haciendo pruebas…</div></div>
+  <div class="card"><ul id="lista"></ul></div>
+  <p><a href="./">← Volver a BSKT Stats</a></p>
+</main>
+<script type="module">
+import { buildMatch, idsIn, temporadaActual } from './fcbq.js';
+
+const T = temporadaActual();
+const pruebas = [
+  ['Partido añadido (esta temporada)', 'getJsonWithMatchMoves/2b5cd3f4-2158-4ada-a4d6-ec5bbbc4080f?currentSeason=true'],
+  ['Partido añadido (sin temporada actual)', 'getJsonWithMatchMoves/2b5cd3f4-2158-4ada-a4d6-ec5bbbc4080f?currentSeason=false'],
+  ['Partido 2025-26 (temporada actual)', 'getJsonWithMatchMoves/69a43ead5213ba0001ee1978?currentSeason=true'],
+  ['Partido 2025-26 (anterior)', 'getJsonWithMatchMoves/69a43ead5213ba0001ee1978?currentSeason=false'],
+  ['Estadísticas 2025-26 (anterior)', 'getJsonWithMatchStats/69a43ead5213ba0001ee1978?currentSeason=false'],
+  ['Partido antiguo (UUID)', 'getJsonWithMatchMoves/a9afd4ae-15c1-43fb-b514-d3985f3602b6?currentSeason=false'],
+  [`Equipo 73258 · temporada ${T}`, `team-stats/team/73258/season/${T}`],
+  [`Equipo 73258 · temporada ${T - 1}`, `team-stats/team/73258/season/${T - 1}`],
+];
+// Equipos y partidos que tienes en la web
+try {
+  const l = await (await fetch('/api/partidos')).json();
+  for (const e of l.equipos || []) {
+    pruebas.push([`Tu equipo ${e.id} · ${T}`, `team-stats/team/${e.id}/season/${T}`]);
+    pruebas.push([`Tu equipo ${e.id} · ${T - 1}`, `team-stats/team/${e.id}/season/${T - 1}`]);
+  }
+  for (const p of l.partidos || []) pruebas.push([`Tu partido ${p.id.slice(0, 8)}`, `getJsonWithMatchMoves/${p.id}?currentSeason=true`]);
+} catch {}
+
+const lista = document.getElementById('lista');
+const resultados = [];
+for (const [nombre, ruta] of pruebas) {
+  const li = document.createElement('li');
+  li.innerHTML = `<span>${nombre}</span><span>…</span>`;
+  lista.append(li);
+  const r = { nombre, ruta };
+  try {
+    const res = await fetch('/fcbq/' + ruta, { cache: 'no-store' });
+    const txt = await res.text();
+    r.status = res.status; r.bytes = txt.length; r.muestra = txt.slice(0, 1500);
+    try {
+      const j = JSON.parse(txt);
+      r.claves = j && typeof j === 'object' ? Object.keys(j).slice(0, 20) : typeof j;
+      r.ids = idsIn(txt).length;
+      if (ruta.startsWith('getJsonWithMatchMoves')) r.jugadas = buildMatch('x', j, null).jugadas;
+    } catch {}
+  } catch (e) { r.error = String(e); }
+  resultados.push(r);
+  const lleno = r.bytes > 2;
+  li.lastChild.className = r.error ? 'bad' : lleno ? 'ok' : 'vacio';
+  li.lastChild.textContent = r.error ? 'error' : lleno ? `✅ ${r.bytes} bytes${r.jugadas ? ` · ${r.jugadas} jugadas` : ''}` : 'vacío';
+}
+
+const estado = document.getElementById('estado');
+try {
+  await fetch('/api/diagnostico', { method: 'POST', headers: { 'content-type': 'application/json' },
+    body: JSON.stringify({ navegador: navigator.userAgent, idioma: navigator.language, zona: Intl.DateTimeFormat().resolvedOptions().timeZone, resultados }) });
+  const alguno = resultados.some((r) => r.bytes > 2);
+  estado.textContent = alguno ? '✅ Listo. ¡La FCBQ responde desde tu conexión! Ya puedes volver al chat.' : '✅ Listo. Resultados enviados. Ya puedes volver al chat.';
+} catch {
+  estado.textContent = '⚠️ Pruebas hechas, pero no se pudieron enviar los resultados.';
+}
+</script>
+</body>
+</html>
