@@ -16,14 +16,14 @@ for (const url of urls) {
     if (/\.(png|jpe?g|svg|gif|woff2?|css|ico)(\?|$)/.test(u) || /google|gstatic|doubleclick|facebook/.test(u)) return;
     let extra = '';
     if (/json/.test(r.headers()['content-type'] || '')) {
-      try { extra = ' ' + (await r.text()).slice(0, 1500); } catch {}
+      try { extra = " " + (await r.text()).slice(0, 3000); } catch {}
     }
     reqs.push(`${r.status()} ${r.request().method()} ${u}${extra}`);
   });
   try {
     if (/^https?:\/\/msstats/.test(url)) {
       const r = await ctx.request.get(url);
-      const b = await r.body(); console.log(r.status(), r.headers()['content-type'], b.length, 'bytes', /pdf/.test(r.headers()['content-type']||'') ? '' : b.toString().slice(0, 2500));
+      const b = await r.body(); console.log(r.status(), r.headers()['content-type'], b.length, 'bytes', /pdf/.test(r.headers()['content-type']||'') ? '' : b.toString().slice(0, 6000));
       continue;
     }
     await page.goto(url, { waitUntil: 'networkidle', timeout: 60000 });

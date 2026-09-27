@@ -1,4 +1,4 @@
-# Estadísticas automáticas FCBQ
+# BSKT Stats
 
 Web gratuita (GitHub Pages) que lee el **jugada a jugada** de basquetcatala.cat y cuenta
 puntos, canastas de 2, triples, tiros libres, faltas (y rebotes, asistencias, etc. si vienen).
