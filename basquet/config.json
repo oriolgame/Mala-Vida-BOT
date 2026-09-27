@@ -1,0 +1,5 @@
+{
+  "_ayuda": "Pon aquí los enlaces. 'equipos': página del equipo en basquetcatala.cat (se detectan sus partidos solos). 'partidos': enlaces o IDs de partidos concretos (opcional).",
+  "equipos": [],
+  "partidos": []
+}

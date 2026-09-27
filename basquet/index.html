@@ -1,0 +1,177 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Estadísticas Bàsquet</title>
+  <style>
+    :root { --bg:#0f0f13; --card:#1a1a22; --line:#2a2a36; --text:#e8e8f0; --muted:#8a8a9a; --accent:#ff7a1a; }
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    body { font-family: 'Segoe UI', system-ui, sans-serif; background: var(--bg); color: var(--text); padding: 20px 16px 40px; }
+    main { max-width: 1000px; margin: 0 auto; display: flex; flex-direction: column; gap: 16px; }
+    header h1 { font-size: 1.6rem; } header h1 span { color: var(--accent); }
+    header p { color: var(--muted); font-size: .85rem; margin-top: 4px; }
+    .card { background: var(--card); border: 1px solid var(--line); border-radius: 12px; padding: 16px; }
+    .tabs { display: flex; gap: 8px; flex-wrap: wrap; }
+    button, select { font: inherit; color: var(--text); background: var(--card); border: 1px solid var(--line); border-radius: 8px; padding: 8px 12px; cursor: pointer; }
+    button.on { background: var(--accent); border-color: var(--accent); color: #111; font-weight: 600; }
+    select { width: 100%; }
+    .score { display: grid; grid-template-columns: 1fr auto 1fr; align-items: center; gap: 12px; text-align: center; }
+    .score .n { font-size: 2.6rem; font-weight: 800; }
+    .score .t { font-size: .95rem; color: var(--muted); }
+    .score .vs { color: var(--muted); }
+    .kpis { display: grid; grid-template-columns: repeat(auto-fit, minmax(110px, 1fr)); gap: 10px; margin-top: 14px; }
+    .kpi { background: var(--bg); border-radius: 10px; padding: 10px; text-align: center; }
+    .kpi b { display: block; font-size: 1.3rem; } .kpi small { color: var(--muted); font-size: .75rem; }
+    h2 { font-size: 1.05rem; margin-bottom: 10px; }
+    .scroll { overflow-x: auto; }
+    table { width: 100%; border-collapse: collapse; font-size: .88rem; white-space: nowrap; }
+    th, td { padding: 7px 8px; text-align: right; border-bottom: 1px solid var(--line); }
+    th { color: var(--muted); font-weight: 600; cursor: pointer; user-select: none; }
+    th:nth-child(-n+2), td:nth-child(-n+2) { text-align: left; }
+    tr.tot td { font-weight: 700; border-top: 2px solid var(--line); }
+    td.pts { color: var(--accent); font-weight: 700; }
+    .f5 { color: #ff5c5c; font-weight: 700; }
+    .empty { color: var(--muted); text-align: center; padding: 30px 10px; line-height: 1.6; }
+  </style>
+</head>
+<body>
+<main>
+  <header>
+    <h1>🏀 Estadísticas <span>automáticas</span></h1>
+    <p id="upd">Cargando…</p>
+  </header>
+
+  <div class="tabs" id="modes">
+    <button data-m="partido" class="on">Por partido</button>
+    <button data-m="temporada">Temporada (acumulado)</button>
+  </div>
+
+  <div id="app"></div>
+</main>
+
+<script>
+const COLS = [
+  ['dorsal', '#'], ['nombre', 'Jugador'], ['pj', 'PJ'], ['puntos', 'PTS'],
+  ['t2', 'T2'], ['t3', 'Triples'], ['t1', 'TL'], ['faltas', 'Faltas'],
+  ['rebotes', 'REB'], ['asistencias', 'AST'], ['robos', 'ROB'], ['perdidas', 'PER'], ['tapones', 'TAP'],
+];
+const SUM = ['puntos','t1','t1i','t2','t2i','t3','t3i','faltas','tecnicas','antideportivas','faltasRecibidas','rebotes','asistencias','robos','perdidas','tapones'];
+let data = { partidos: [] }, mode = 'partido', matchIdx = 0, teamIdx = 0, sortKey = 'puntos', sortDir = -1;
+const app = document.getElementById('app');
+const esc = (s) => String(s ?? '').replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
+
+function cell(p, k) {
+  if (k === 't1' || k === 't2' || k === 't3') return p[k + 'i'] ? `${p[k]}/${p[k + 'i']}` : '0';
+  if (k === 'faltas') return p.faltas >= 5 ? `<span class="f5">${p.faltas}</span>` : p.faltas;
+  return esc(p[k] ?? '');
+}
+
+function table(rows, total, showPJ) {
+  const cols = COLS.filter(([k]) => (k !== 'pj' || showPJ) &&
+    (!['rebotes','asistencias','robos','perdidas','tapones'].includes(k) || rows.some((r) => r[k])));
+  rows = [...rows].sort((a, b) => {
+    const x = a[sortKey], y = b[sortKey];
+    return (typeof x === 'number' ? (x - y) : String(x).localeCompare(String(y), 'es', { numeric: true })) * sortDir;
+  });
+  return `<div class="scroll"><table><thead><tr>${cols.map(([k, l]) => `<th data-k="${k}">${l}${sortKey === k ? (sortDir < 0 ? ' ▾' : ' ▴') : ''}</th>`).join('')}</tr></thead><tbody>
+    ${rows.map((p) => `<tr>${cols.map(([k]) => `<td class="${k === 'puntos' ? 'pts' : ''}">${cell(p, k)}</td>`).join('')}</tr>`).join('')}
+    ${total ? `<tr class="tot">${cols.map(([k], i) => `<td>${i === 1 ? 'Equipo' : i === 0 || k === 'pj' ? '' : cell(total, k)}</td>`).join('')}</tr>` : ''}
+  </tbody></table></div>`;
+}
+
+function kpis(t) {
+  const pct = (a, b) => (b ? Math.round((100 * a) / b) + '%' : '–');
+  return `<div class="kpis">
+    <div class="kpi"><b>${t.puntos}</b><small>Puntos</small></div>
+    <div class="kpi"><b>${t.t3}</b><small>Triples (${pct(t.t3, t.t3i)})</small></div>
+    <div class="kpi"><b>${t.t2}</b><small>Canastas de 2 (${pct(t.t2, t.t2i)})</small></div>
+    <div class="kpi"><b>${t.t1}/${t.t1i}</b><small>Tiros libres (${pct(t.t1, t.t1i)})</small></div>
+    <div class="kpi"><b>${t.faltas}</b><small>Faltas</small></div>
+  </div>`;
+}
+
+function teamTabs(names) {
+  return `<div class="tabs" id="teams" style="margin-bottom:12px">${names.map((n, i) => `<button data-t="${i}" class="${i === teamIdx ? 'on' : ''}">${esc(n)}</button>`).join('')}</div>`;
+}
+
+function renderMatch() {
+  const ps = data.partidos;
+  const m = ps[matchIdx];
+  const [a, b] = m.equipos;
+  const e = m.equipos[teamIdx] || a;
+  const label = (p) => p.equipos.map((x) => `${x.nombre} ${x.total.puntos}`).join(' – ');
+  app.innerHTML = `
+    <div class="card"><select id="sel">${ps.map((p, i) => `<option value="${i}" ${i === matchIdx ? 'selected' : ''}>${esc(label(p))}</option>`).join('')}</select></div>
+    <div class="card">
+      <div class="score">
+        <div><div class="n">${a?.total.puntos ?? 0}</div><div class="t">${esc(a?.nombre)}</div></div>
+        <div class="vs">${m.periodoActual ? 'Periodo ' + esc(m.periodoActual) : 'vs'}</div>
+        <div><div class="n">${b?.total.puntos ?? 0}</div><div class="t">${esc(b?.nombre ?? '')}</div></div>
+      </div>
+    </div>
+    <div class="card">
+      ${teamTabs(m.equipos.map((x) => x.nombre))}
+      ${kpis(e.total)}
+    </div>
+    <div class="card"><h2>Jugadores · ${esc(e.nombre)}</h2>${table(e.jugadores, e.total, false)}</div>`;
+  document.getElementById('sel').onchange = (ev) => { matchIdx = +ev.target.value; teamIdx = 0; render(); };
+}
+
+function renderSeason() {
+  // Acumula por equipo (nombre) y jugador a lo largo de todos los partidos
+  const teams = {};
+  for (const m of data.partidos) for (const e of m.equipos) {
+    const t = (teams[e.nombre] ??= { nombre: e.nombre, pj: 0, total: Object.fromEntries(SUM.map((k) => [k, 0])), jug: {} });
+    t.pj++;
+    SUM.forEach((k) => (t.total[k] += e.total[k] || 0));
+    for (const p of e.jugadores) {
+      const j = (t.jug[p.nombre] ??= { nombre: p.nombre, dorsal: p.dorsal, pj: 0, ...Object.fromEntries(SUM.map((k) => [k, 0])) });
+      j.pj++; j.dorsal = p.dorsal || j.dorsal;
+      SUM.forEach((k) => (j[k] += p[k] || 0));
+    }
+  }
+  const list = Object.values(teams).sort((a, b) => b.pj - a.pj);
+  const t = list[teamIdx] || list[0];
+  app.innerHTML = `
+    <div class="card">${teamTabs(list.map((x) => `${x.nombre} (${x.pj})`))}${kpis(t.total)}</div>
+    <div class="card"><h2>Temporada · ${esc(t.nombre)} · ${t.pj} partidos</h2>${table(Object.values(t.jug), t.total, true)}</div>`;
+}
+
+function render() {
+  document.querySelectorAll('#modes button').forEach((b) => b.classList.toggle('on', b.dataset.m === mode));
+  if (!data.partidos.length) {
+    app.innerHTML = `<div class="card empty">Todavía no hay partidos.<br>Añade el enlace de tu equipo o de un partido en <b>basquet/config.json</b> y en unos minutos aparecerán aquí solos.</div>`;
+    return;
+  }
+  mode === 'partido' ? renderMatch() : renderSeason();
+  app.querySelectorAll('#teams button').forEach((b) => (b.onclick = () => { teamIdx = +b.dataset.t; render(); }));
+  app.querySelectorAll('th').forEach((th) => (th.onclick = () => {
+    const k = th.dataset.k;
+    sortDir = sortKey === k ? -sortDir : (k === 'nombre' || k === 'dorsal' ? 1 : -1);
+    sortKey = k; render();
+  }));
+}
+
+document.querySelectorAll('#modes button').forEach((b) => (b.onclick = () => { mode = b.dataset.m; teamIdx = 0; render(); }));
+
+async function load() {
+  try {
+    const r = await fetch('data/partidos.json?t=' + Date.now(), { cache: 'no-store' });
+    const d = await r.json();
+    const changed = JSON.stringify(d) !== JSON.stringify(data);
+    data = d;
+    if (matchIdx >= data.partidos.length) matchIdx = 0;
+    document.getElementById('upd').textContent = data.actualizado
+      ? 'Actualizado: ' + new Date(data.actualizado).toLocaleString('es-ES') + ' · se refresca solo'
+      : 'Se actualiza automáticamente desde el jugada a jugada de la FCBQ';
+    if (changed) render();
+  } catch (e) {
+    document.getElementById('upd').textContent = 'No se pudieron cargar los datos';
+  }
+}
+load();
+setInterval(load, 60000);
+</script>
+</body>
+</html>
