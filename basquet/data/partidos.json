@@ -1,4 +1,10 @@
 {
- "partidos": [],
- "actualizado": "2026-09-27T17:16:06.467Z"
+ "partidos": [
+  {
+   "id": "2b5cd3f4-2158-4ada-a4d6-ec5bbbc4080f",
+   "pendiente": true,
+   "equipos": []
+  }
+ ],
+ "actualizado": "2026-09-27T19:22:36.966Z"
 }
