@@ -47,6 +47,9 @@
     .chip { display: inline-flex; align-items: center; gap: 6px; background: var(--bg); border: 1px solid var(--line); border-radius: 999px; padding: 4px 6px 4px 12px; font-size: .82rem; }
     .chip small { color: var(--muted); }
     .chip button { border: 0; background: none; padding: 2px 6px; color: var(--muted); }
+    button.partido { width: 100%; display: flex; justify-content: space-between; align-items: center; gap: 10px; border: 0; background: none; padding: 0; text-align: left; }
+    button.partido small { display: block; color: var(--muted); font-size: .8rem; margin-top: 2px; }
+    button.partido .pts { color: var(--accent); font-weight: 700; white-space: nowrap; }
     .empty { color: var(--muted); text-align: center; padding: 30px 10px; line-height: 1.6; }
   </style>
 </head>
@@ -58,6 +61,7 @@
   </header>
 
   <div class="tabs" id="modes">
+    <button data-m="equipo">Mi equipo</button>
     <button data-m="partido" class="on">Por partido</button>
     <button data-m="temporada">Temporada (acumulado)</button>
   </div>
@@ -81,11 +85,15 @@ const COLS = [
   ['dorsal', '#'], ['nombre', 'Jugador'], ['pj', 'PJ'], ['puntos', 'PTS'],
   ['t2', 'T2'], ['t3', 'Triples'], ['t1', 'TL'], ['faltas', 'Faltas'],
   ['rebotes', 'REB'], ['asistencias', 'AST'], ['robos', 'ROB'], ['perdidas', 'PER'], ['tapones', 'TAP'],
+  ['min', 'Min'], ['val', 'Val'],
 ];
+const OPCIONALES = ['rebotes','asistencias','robos','perdidas','tapones','min','val'];
 const SUM = ['puntos','t1','t1i','t2','t2i','t3','t3i','faltas','tecnicas','antideportivas','faltasRecibidas','rebotes','asistencias','robos','perdidas','tapones'];
 let data = null, mode = 'partido', matchIdx = 0, teamIdx = 0, sortKey = 'puntos', sortDir = -1;
 const app = document.getElementById('app');
 let lista = { partidos: [], equipos: [] };
+const equipos = {};          // id de equipo → datos de la FCBQ (temporada + partidos jugados)
+let equipoSel = 0, partidoAbierto = null;
 const cache = {};            // id → partido calculado (se reutiliza entre refrescos)
 const estadoEquipo = {};     // id de equipo → nº de partidos encontrados
 const hint = document.getElementById('addHint');
@@ -121,9 +129,10 @@ document.getElementById('addForm').onsubmit = async (ev) => {
     else say(d.nuevos.length ? '✅ Partido añadido.' : 'Ese partido ya estaba en la lista 👍');
     if (d.nuevos.length && d.tipo === 'partido') matchIdx = 0;
     await refresh();
+    if (d.tipo === 'equipo') { mode = 'equipo'; equipoSel = lista.equipos.findIndex((e) => e.id === (d.nuevos[0] || '')); if (equipoSel < 0) equipoSel = 0; render(); }
     if (d.tipo === 'equipo' && d.nuevos.length) {
       const n = estadoEquipo[d.nuevos[0]] || 0;
-      say(n ? `✅ Equipo añadido: ${n} partidos encontrados. Se actualizan solos.` : '✅ Equipo añadido. La FCBQ aún no da partidos suyos; los iré buscando cada minuto.');
+      say(n ? `✅ Equipo añadido: ${n} partidos jugados. Se actualiza solo.` : '✅ Equipo añadido. Aún no tiene partidos con estadísticas; aparecerán solos.');
     }
   } catch (e) { say(esc(e.message), true); }
 };
@@ -137,14 +146,15 @@ async function quitar(id, que) {
 const esc = (s) => String(s ?? '').replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
 
 function cell(p, k) {
-  if (k === 't1' || k === 't2' || k === 't3') return p[k + 'i'] ? `${p[k]}/${p[k + 'i']}` : '0';
+  // Sin intentos conocidos (la FCBQ no registra los fallos de 2 y 3) se muestran solo las anotadas
+  if (k === 't1' || k === 't2' || k === 't3') return p[k + 'i'] == null ? p[k] : p[k + 'i'] ? `${p[k]}/${p[k + 'i']}` : '0';
   if (k === 'faltas') return p.faltas >= 5 ? `<span class="f5">${p.faltas}</span>` : p.faltas;
   return esc(p[k] ?? '');
 }
 
 function table(rows, total, showPJ) {
   const cols = COLS.filter(([k]) => (k !== 'pj' || showPJ) &&
-    (!['rebotes','asistencias','robos','perdidas','tapones'].includes(k) || rows.some((r) => r[k])));
+    (!OPCIONALES.includes(k) || rows.some((r) => r[k])));
   rows = [...rows].sort((a, b) => {
     const x = a[sortKey], y = b[sortKey];
     return (typeof x === 'number' ? (x - y) : String(x).localeCompare(String(y), 'es', { numeric: true })) * sortDir;
@@ -157,10 +167,11 @@ function table(rows, total, showPJ) {
 
 function kpis(t) {
   const pct = (a, b) => (b ? Math.round((100 * a) / b) + '%' : '–');
+  const et = (nombre, a, b) => (b == null ? nombre : `${nombre} (${pct(a, b)})`);
   return `<div class="kpis">
     <div class="kpi"><b>${t.puntos}</b><small>Puntos</small></div>
-    <div class="kpi"><b>${t.t3}</b><small>Triples (${pct(t.t3, t.t3i)})</small></div>
-    <div class="kpi"><b>${t.t2}</b><small>Canastas de 2 (${pct(t.t2, t.t2i)})</small></div>
+    <div class="kpi"><b>${t.t3}</b><small>${et('Triples', t.t3, t.t3i)}</small></div>
+    <div class="kpi"><b>${t.t2}</b><small>${et('Canastas de 2', t.t2, t.t2i)}</small></div>
     <div class="kpi"><b>${t.t1}/${t.t1i}</b><small>Tiros libres (${pct(t.t1, t.t1i)})</small></div>
     <div class="kpi"><b>${t.faltas}</b><small>Faltas</small></div>
   </div>`;
@@ -230,6 +241,7 @@ function renderSeason() {
 function render() {
   if (!data) return;
   document.querySelectorAll('#modes button').forEach((b) => b.classList.toggle('on', b.dataset.m === mode));
+  if (mode === 'equipo') { renderEquipo(); bindTabla(); return; }
   if (!data.partidos.length) {
     app.innerHTML = lista.equipos.length
       ? `<div class="card empty">🔎 Siguiendo ${lista.equipos.length === 1 ? 'a tu equipo' : 'a tus equipos'}, pero la FCBQ todavía no ha publicado partidos suyos.<br>Mientras tanto puedes añadir partidos pegando su enlace.</div>`
@@ -237,6 +249,10 @@ function render() {
     return;
   }
   mode === 'partido' ? renderMatch() : renderSeason();
+  bindTabla();
+}
+
+function bindTabla() {
   app.querySelectorAll('#teams button').forEach((b) => (b.onclick = () => { teamIdx = +b.dataset.t; render(); }));
   app.querySelectorAll('th').forEach((th) => (th.onclick = () => {
     const k = th.dataset.k;
@@ -245,13 +261,105 @@ function render() {
   }));
 }
 
+// ---------- Mi equipo: estadísticas oficiales de la FCBQ por temporada y por partido ----------
+// Convierte un registro de la FCBQ (temporada o partido de un jugador) a las columnas de la tabla
+const jugadorFCBQ = (x) => ({
+  nombre: x.name, dorsal: x.dorsal != null ? String(x.dorsal) : '', pj: x.matchesPlayed,
+  puntos: x.totalScore || 0, t1: x.sumShotsOfOneSuccessful || 0, t1i: x.sumShotsOfOneAttempted || 0,
+  t2: x.sumShotsOfTwoSuccessful || 0, t3: x.sumShotsOfThreeSuccessful || 0,
+  faltas: x.sumFouls || 0, rebotes: x.sumRebounds || 0, asistencias: x.sumAssists || 0,
+  min: x.timePlayed || 0, val: x.sumValoration || 0,
+});
+const sumar = (rows) => rows.reduce((t, r) => {
+  for (const k of ['puntos','t1','t1i','t2','t3','faltas','rebotes','asistencias','min','val']) t[k] = (t[k] || 0) + (r[k] || 0);
+  return t;
+}, {});
+
+async function cargarEquipo(id) {
+  const prev = equipos[id];
+  if (prev && Date.now() - prev.t < 5 * 60e3) return prev;   // como mucho cada 5 minutos
+  try {
+    const d = await fcbq(`team-stats/team/${id}/season/${temporadaActual()}`);
+    if (!d.team) return (equipos[id] = { t: Date.now(), vacio: true });
+    const jugadores = (d.players || []).map(jugadorFCBQ);
+    // Partido a partido: estadísticas de cada jugador en cada partido
+    const partidos = {};
+    await Promise.all((d.players || []).map(async (pl) => {
+      try {
+        const ps = await fcbq(`player-stats/federated/${pl.uuid}/team/${id}`);
+        for (const ev of ps?.[id]?.evolutiveStats || []) {
+          const m = (partidos[ev.matchCallUuid] ??= { id: ev.matchCallUuid, fecha: ev.matchDay, rival: ev.opponentTeamName, jugadores: [] });
+          m.jugadores.push({ ...jugadorFCBQ(ev), pj: undefined });
+        }
+      } catch {}
+    }));
+    const lista = Object.values(partidos)
+      .map((m) => ({ ...m, total: sumar(m.jugadores) }))
+      .sort((a, b) => String(b.fecha).localeCompare(String(a.fecha)));
+    return (equipos[id] = { t: Date.now(), info: d.team, jugadores, total: sumar(jugadores), partidos: lista });
+  } catch {
+    return prev || { t: Date.now(), vacio: true };
+  }
+}
+
+const fechaCorta = (f) => {
+  const d = new Date(String(f).replace(' ', 'T'));
+  return isNaN(d) ? esc(f) : d.toLocaleDateString('es-ES', { weekday: 'short', day: 'numeric', month: 'short' }) + ' · ' + d.toLocaleTimeString('es-ES', { hour: '2-digit', minute: '2-digit' });
+};
+
+function renderEquipo() {
+  if (!lista.equipos.length) {
+    app.innerHTML = `<div class="card empty">👥 Pega arriba el enlace de tu equipo (…/equip/…) y pulsa <b>＋ Añadir</b>.<br>Verás sus partidos jugados y las estadísticas de la temporada.</div>`;
+    return;
+  }
+  const eq = lista.equipos[equipoSel] || lista.equipos[0];
+  const d = equipos[eq.id];
+  const tabs = lista.equipos.length > 1
+    ? `<div class="tabs" style="margin-bottom:12px">${lista.equipos.map((e, i) => `<button data-eqsel="${i}" class="${i === equipoSel ? 'on' : ''}">${esc(equipos[e.id]?.info?.teamName || 'Equipo ' + e.id)}</button>`).join('')}</div>` : '';
+  if (!d) { app.innerHTML = `<div class="card pend">${tabs}⏳ Cargando el equipo…</div>`; return bindEq(); }
+  if (d.vacio) { app.innerHTML = `<div class="card pend">${tabs}⏳ La FCBQ aún no tiene estadísticas de este equipo esta temporada.<br>Aparecerán solas después de su primer partido.</div>`; return bindEq(); }
+  const i = d.info, r = i.teamResults || {}, sc = i.teamScore || {};
+  const partidos = d.partidos.map((m) => {
+    const abierto = partidoAbierto === m.id;
+    return `<div class="card">
+      <button class="partido" data-abrir="${esc(m.id)}">
+        <span><b>vs ${esc(m.rival)}</b><small>${fechaCorta(m.fecha)}</small></span>
+        <span class="pts">${m.total.puntos} pts ${abierto ? '▴' : '▾'}</span>
+      </button>
+      ${abierto ? `<div style="margin-top:12px">${kpis(m.total)}<h2 style="margin-top:14px">Jugadores</h2>${table(m.jugadores, m.total, false)}</div>` : ''}
+    </div>`;
+  }).join('');
+  app.innerHTML = `
+    <div class="card">
+      ${tabs}
+      <h2 style="margin-bottom:2px">${esc(i.teamName)}</h2>
+      <p class="hint" style="margin-top:0">${esc(i.categoryName || '')} · Temporada ${temporadaActual()}-${String(temporadaActual() + 1).slice(2)}</p>
+      <div class="kpis">
+        <div class="kpi"><b>${r.wins ?? 0}-${r.losses ?? 0}</b><small>Victorias-Derrotas</small></div>
+        <div class="kpi"><b>${sc.ScoreFor ?? 0}-${sc.ScoreAgainst ?? 0}</b><small>Puntos a favor-en contra</small></div>
+        <div class="kpi"><b>${i.sumMatches ?? d.partidos.length}</b><small>Partidos jugados</small></div>
+      </div>
+    </div>
+    <h2 style="padding:0 4px">Partidos jugados</h2>
+    ${partidos || '<div class="card pend">Todavía no hay partidos jugados.</div>'}
+    <div class="card"><h2>Temporada · jugadores</h2>${kpis(d.total)}<div style="margin-top:12px">${table(d.jugadores, d.total, true)}</div></div>
+    <p class="hint" style="padding:0 4px">Datos oficiales de la FCBQ. La FCBQ solo registra los fallos de tiros libres, por eso las canastas de 2 y los triples se muestran sin intentos.</p>`;
+  bindEq();
+}
+
+function bindEq() {
+  app.querySelectorAll('[data-eqsel]').forEach((b) => (b.onclick = () => { equipoSel = +b.dataset.eqsel; partidoAbierto = null; render(); }));
+  app.querySelectorAll('[data-abrir]').forEach((b) => (b.onclick = () => { partidoAbierto = partidoAbierto === b.dataset.abrir ? null : b.dataset.abrir; render(); }));
+}
+
 document.querySelectorAll('#modes button').forEach((b) => (b.onclick = () => { mode = b.dataset.m; teamIdx = 0; render(); }));
 
 function renderEquipos() {
   document.getElementById('equipos').innerHTML = lista.equipos.map((e) => {
     const n = estadoEquipo[e.id];
-    const info = n == null ? 'buscando…' : n ? `${n} partidos` : 'sin partidos aún';
-    return `<span class="chip">👥 Equipo ${esc(e.id)} <small>${info}</small><button data-eq="${esc(e.id)}" title="Dejar de seguir">✕</button></span>`;
+    const info = n == null ? 'cargando…' : n ? `${n} jugados` : 'sin partidos aún';
+    const nombre = equipos[e.id]?.info?.teamName || 'Equipo ' + e.id;
+    return `<span class="chip">👥 ${esc(nombre)} <small>${info}</small><button data-eq="${esc(e.id)}" title="Dejar de seguir">✕</button></span>`;
   }).join('');
   document.querySelectorAll('[data-eq]').forEach((b) => (b.onclick = () => quitar(b.dataset.eq, 'equipo')));
 }
@@ -261,14 +369,6 @@ async function fcbq(path) {
   const r = await fetch('/fcbq/' + path, { cache: 'no-store' });
   if (!r.ok) throw new Error(r.status);
   return r.json();
-}
-
-// Partidos de un equipo (función de la FCBQ «team-stats», experimental)
-async function partidosDeEquipo(id) {
-  try {
-    const d = await fcbq(`team-stats/team/${id}/season/${temporadaActual()}`);
-    return idsIn(JSON.stringify(d));
-  } catch { return []; }
 }
 
 async function cargarPartido(id) {
@@ -297,9 +397,8 @@ async function refresh() {
     const manual = new Set(lista.partidos.map((p) => p.id));
     const deEquipo = new Set();
     await Promise.all(lista.equipos.map(async (e) => {
-      const ids = await partidosDeEquipo(e.id);
-      estadoEquipo[e.id] = ids.length;
-      ids.forEach((i) => deEquipo.add(i));
+      const d = await cargarEquipo(e.id);
+      estadoEquipo[e.id] = d.vacio ? 0 : d.partidos.length;
     }));
     renderEquipos();
     const ids = [...new Set([...manual, ...deEquipo])];
@@ -320,6 +419,7 @@ async function refresh() {
 async function load() {
   try {
     lista = await api('GET');
+    if (lista.equipos.length) mode = 'equipo';
   } catch {
     document.getElementById('upd').textContent = 'No se pudo cargar la lista de partidos';
   }

@@ -17,7 +17,7 @@ const json = (body, status = 200) =>
   new Response(JSON.stringify(body), { status, headers: { 'content-type': 'application/json', 'cache-control': 'no-store' } });
 
 // Permite sustituir el almacén en pruebas locales
-const store = () => globalThis.__bsktStore || getStore('bskt-stats');
+const store = () => globalThis.__bsktStore || getStore({ name: 'bskt-stats', consistency: 'strong' });
 
 async function leer() {
   return { ...vacia(), ...((await store().get(KEY, { type: 'json' })) || SEMILLA) };
