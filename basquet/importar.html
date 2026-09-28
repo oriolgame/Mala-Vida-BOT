@@ -1,0 +1,50 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>BSKT Stats · Captura recibida</title>
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>🏀</text></svg>" />
+  <style>
+    :root { --bg:#0f0f13; --card:#1a1a22; --line:#2a2a36; --text:#e8e8f0; --muted:#8a8a9a; --accent:#ff7a1a; }
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body { font-family: 'Segoe UI', system-ui, sans-serif; background: var(--bg); color: var(--text); padding: 20px 16px 40px; }
+    main { max-width: 680px; margin: 0 auto; display: flex; flex-direction: column; gap: 14px; }
+    h1 { font-size: 1.4rem; } h1 span { color: var(--accent); }
+    p { color: var(--muted); line-height: 1.55; }
+    .card { background: var(--card); border: 1px solid var(--line); border-radius: 12px; padding: 16px; }
+    #estado { font-size: 1.1rem; font-weight: 600; color: var(--text); }
+    ul { list-style: none; display: flex; flex-direction: column; gap: 4px; font-size: .85rem; color: var(--muted); }
+    a { color: var(--accent); }
+  </style>
+</head>
+<body>
+<main>
+  <h1>🏀 BSKT <span>Stats</span></h1>
+  <div class="card"><p id="estado">⏳ Leyendo la captura…</p></div>
+  <div class="card"><ul id="detalle"></ul></div>
+  <p><a href="./">← Volver a BSKT Stats</a></p>
+</main>
+<script type="module">
+import { classify } from './fcbq.js';
+const id = new URLSearchParams(location.search).get('id');
+const estado = document.getElementById('estado');
+const detalle = document.getElementById('detalle');
+const li = (t) => { const e = document.createElement('li'); e.textContent = t; detalle.append(e); };
+try {
+  const c = await (await fetch('/api/captura?id=' + encodeURIComponent(id))).json();
+  if (c.error) throw new Error(c.error);
+  const filas = (c.tablas || []).flatMap((t) => t.filas.map((f) => f.join(' · ')));
+  const jugadas = filas.filter((f) => { const k = classify(f); return k && !k.ignore; });
+  estado.textContent = `✅ Captura recibida de «${c.titulo || c.url}».`;
+  li(`Página: ${c.url}`);
+  li(`${(c.tablas || []).length} tablas · ${filas.length} filas · ${jugadas.length} parecen jugadas`);
+  li(`${(c.iframes || []).length} marcos · ${(c.recursos || []).length} peticiones de datos`);
+  jugadas.slice(0, 8).forEach((f) => li('Ejemplo: ' + f.slice(0, 140)));
+  li('Claude revisará esta captura para ajustar el cálculo de estadísticas del jugada a jugada.');
+} catch (e) {
+  estado.textContent = '⚠️ No se pudo leer la captura: ' + e.message;
+}
+</script>
+</body>
+</html>
