@@ -1,0 +1,85 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>BSKT Stats · Botón para enviar</title>
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>🏀</text></svg>" />
+  <style>
+    :root { --bg:#0f0f13; --card:#1a1a22; --line:#2a2a36; --text:#e8e8f0; --muted:#8a8a9a; --accent:#ff7a1a; }
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body { font-family: 'Segoe UI', system-ui, sans-serif; background: var(--bg); color: var(--text); padding: 20px 16px 40px; }
+    main { max-width: 680px; margin: 0 auto; display: flex; flex-direction: column; gap: 14px; }
+    h1 { font-size: 1.4rem; } h1 span { color: var(--accent); } h2 { font-size: 1.05rem; margin-bottom: 8px; }
+    p, li { color: var(--muted); line-height: 1.55; }
+    ol { padding-left: 20px; display: flex; flex-direction: column; gap: 6px; }
+    b { color: var(--text); }
+    .card { background: var(--card); border: 1px solid var(--line); border-radius: 12px; padding: 16px; }
+    .boton { display: inline-block; background: var(--accent); color: #111; font-weight: 700; text-decoration: none; padding: 12px 18px; border-radius: 10px; margin: 8px 0; cursor: grab; }
+    textarea { width: 100%; height: 90px; background: var(--bg); color: var(--text); border: 1px solid var(--line); border-radius: 8px; padding: 8px; font: 12px ui-monospace, monospace; }
+    button { font: inherit; background: var(--card); color: var(--text); border: 1px solid var(--line); border-radius: 8px; padding: 8px 12px; cursor: pointer; margin-top: 6px; }
+    a { color: var(--accent); }
+  </style>
+</head>
+<body>
+<main>
+  <h1>🏀 BSKT <span>Stats</span> · Botón «Enviar»</h1>
+  <p>Este botón se guarda en tus favoritos. Cuando estés viendo el <b>jugada a jugada</b> de un partido en basquetcatala.cat, lo pulsas y BSKT Stats calcula las estadísticas a partir de las jugadas.</p>
+
+  <div class="card">
+    <h2>En el ordenador (Safari, Chrome…)</h2>
+    <ol>
+      <li>Muestra la barra de favoritos (Safari: <b>⌘ ⇧ B</b> · Chrome: <b>Ctrl/⌘ ⇧ B</b>).</li>
+      <li>Arrastra este botón a la barra: <br><a class="boton" id="marcador" href="#">🏀 Enviar a BSKT Stats</a></li>
+      <li>Abre el jugada a jugada del partido en basquetcatala.cat y pulsa el favorito.</li>
+    </ol>
+  </div>
+
+  <div class="card">
+    <h2>En el móvil</h2>
+    <ol>
+      <li>Copia el código: <textarea id="codigo" readonly></textarea><button id="copiar">Copiar código</button></li>
+      <li>Guarda esta página en favoritos, edita ese favorito, ponle de nombre <b>BSKT</b> y sustituye la dirección por el código copiado.</li>
+      <li>En el jugada a jugada, escribe <b>BSKT</b> en la barra de direcciones y elige el favorito.</li>
+    </ol>
+  </div>
+  <p><a href="./">← Volver a BSKT Stats</a></p>
+</main>
+<script>
+// Código que se ejecuta en la página de basquetcatala.cat (en tu navegador, después de pasar su verificación):
+// copia las tablas y el texto del jugada a jugada y los envía a BSKT Stats con un formulario.
+function capturaBSKT() {
+  var limpia = function (t) { return (t || '').replace(/\s+/g, ' ').trim(); };
+  var d = {
+    version: 1, url: location.href, titulo: document.title, fecha: new Date().toISOString(),
+    tablas: Array.from(document.querySelectorAll('table')).slice(0, 40).map(function (t) {
+      return { id: t.id, clase: t.className, filas: Array.from(t.rows).slice(0, 3000).map(function (r) {
+        return Array.from(r.cells).map(function (c) { return limpia(c.innerText); }); }) };
+    }),
+    texto: document.body.innerText.slice(0, 400000),
+    html: document.body.innerHTML.slice(0, 600000),
+    iframes: Array.from(document.querySelectorAll('iframe')).map(function (f) { return f.src; }),
+    recursos: performance.getEntriesByType('resource').map(function (r) { return r.name; })
+      .filter(function (u) { return !/\.(png|jpe?g|gif|svg|webp|woff2?|ttf|css)(\?|$)/i.test(u); }).slice(0, 500)
+  };
+  var f = document.createElement('form');
+  f.method = 'POST'; f.action = 'https://bskt-stats.netlify.app/api/captura'; f.target = '_blank';
+  var t = document.createElement('textarea'); t.name = 'datos'; t.value = JSON.stringify(d);
+  f.appendChild(t); f.style.display = 'none'; document.body.appendChild(f); f.submit(); f.remove();
+}
+var codigo = 'javascript:' + encodeURIComponent('(' + capturaBSKT.toString() + ')()');
+document.getElementById('marcador').href = codigo;
+document.getElementById('codigo').value = codigo;
+document.getElementById('copiar').onclick = function () {
+  var ta = document.getElementById('codigo');
+  (navigator.clipboard ? navigator.clipboard.writeText(ta.value) : Promise.reject()).then(
+    function () { document.getElementById('copiar').textContent = '✅ Copiado'; },
+    function () { ta.select(); document.execCommand('copy'); document.getElementById('copiar').textContent = '✅ Copiado'; });
+};
+document.getElementById('marcador').onclick = function (e) {
+  e.preventDefault();
+  alert('Arrástralo a la barra de favoritos. Después púlsalo estando en el jugada a jugada de basquetcatala.cat.');
+};
+</script>
+</body>
+</html>
